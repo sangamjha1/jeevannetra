@@ -36,6 +36,11 @@ async function bootstrap() {
         /\.devtunnels\.ms$/,  // Allow all devtunnels.ms domains
       ];
 
+      // Add production frontend URL if configured
+      if (process.env.FRONTEND_URL) {
+        allowedOrigins.push(process.env.FRONTEND_URL);
+      }
+
       if (!origin || allowedOrigins.some(allowed => 
         typeof allowed === 'string' ? allowed === origin : allowed.test(origin)
       )) {
