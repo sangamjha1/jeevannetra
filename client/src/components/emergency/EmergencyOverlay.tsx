@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, ShieldCheck, Phone, MapPin } from 'lucide-react';
-import axios from 'axios';
 
 interface EmergencyOverlayProps {
   isVisible: boolean;
@@ -15,61 +14,10 @@ const EmergencyOverlay: React.FC<EmergencyOverlayProps> = ({ isVisible, onCancel
   const [countdown, setCountdown] = useState(15);
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
 
-  const triggerEmergencyCall = async () => {
-    try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const token = localStorage.getItem('token');
-      
-      let latitude = 0;
-      let longitude = 0;
-
-      // Get user location (optional - don't block if fails)
-      try {
-        const position = await new Promise<GeolocationCoordinates>((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            reject(new Error('Geolocation timeout'));
-          }, 5000); // 5 second timeout
-
-          navigator.geolocation.getCurrentPosition(
-            (pos) => {
-              clearTimeout(timeout);
-              resolve(pos.coords);
-            },
-            (err) => {
-              clearTimeout(timeout);
-              reject(err);
-            }
-          );
-        });
-
-        latitude = position.latitude;
-        longitude = position.longitude;
-        console.log('✅ Location acquired:', latitude, longitude);
-      } catch (geoError: any) {
-        console.warn('⚠️ Location unavailable:', geoError?.message || geoError);
-        // Continue without location - it's optional
-      }
-
-      // Call backend emergency endpoint (SMS + CallMeBot)
-      console.log('📞 Calling emergency endpoint...');
-      const response = await axios.post(
-        `${API_URL}/emergency/auto-call`,
-        {
-          latitude,
-          longitude,
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
-      
-      console.log('✅ Emergency services triggered:', response.data);
-    } catch (error: any) {
-      console.error('Emergency call error:', error?.message || error?.response?.data || error);
-      // Fallback to dialer
-      console.log('📞 Falling back to tel:100 dialer');
-      window.location.href = 'tel:100';
-    }
+  const triggerEmergencyCall = () => {
+    // Simple: Just redirect to emergency dialer
+    console.log('📞 Redirecting to emergency number 100...');
+    window.location.href = 'tel:100';
   };
 
   // Initialize audio context and play beep

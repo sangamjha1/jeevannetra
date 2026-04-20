@@ -360,6 +360,16 @@ async function bootstrap() {
         gender: p.gender,
         dateOfBirth: p.dateOfBirth,
         address: p.address,
+        emergencyContacts: [
+          {
+            name: 'Emergency Contact 1',
+            phone: p.emergencyContact || '+1 555-0000',
+          },
+          {
+            name: 'Emergency Contact 2',
+            phone: '+91 9876543210',
+          },
+        ],
       });
     }
 
