@@ -1,0 +1,76 @@
+@import "tailwindcss";
+@config "../../tailwind.config.ts";
+
+@layer base {
+  :root {
+    --background: 219 14% 8%;
+    --foreground: 210 40% 96%;
+
+    --card: 217 15% 12%;
+    --card-foreground: 210 40% 96%;
+
+    --popover: 217 15% 12%;
+    --popover-foreground: 210 40% 96%;
+
+    --primary: 270 95% 64%;
+    --primary-foreground: 219 14% 8%;
+
+    --secondary: 217 32% 17%;
+    --secondary-foreground: 210 40% 96%;
+
+    --muted: 217 14% 28%;
+    --muted-foreground: 210 12% 56%;
+
+    --accent: 340 82% 52%;
+    --accent-foreground: 219 14% 8%;
+
+    --destructive: 2 75% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 8% 28%;
+    --input: 220 8% 28%;
+    --ring: 262 85% 60%;
+
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 219 14% 8%;
+    --foreground: 210 40% 96%;
+    --card: 217 15% 12%;
+    --card-foreground: 210 40% 96%;
+    --popover: 217 15% 12%;
+    --popover-foreground: 210 40% 96%;
+    --primary: 270 95% 64%;
+    --primary-foreground: 219 14% 8%;
+    --secondary: 217 32% 17%;
+    --secondary-foreground: 210 40% 96%;
+    --muted: 217 14% 28%;
+    --muted-foreground: 210 12% 56%;
+    --accent: 340 82% 52%;
+    --accent-foreground: 219 14% 8%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 96%;
+    --border: 217 14% 20%;
+    --input: 217 14% 16%;
+    --ring: 270 95% 64%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    background: radial-gradient(circle at 20% 50%, rgba(79, 39, 131, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(59, 130, 246, 0.05) 0%, transparent 50%),
+                linear-gradient(135deg, #0f172a 0%, #1a1f3a 50%, #0d1b2a 100%);
+    background-attachment: fixed;
+  }
+
+  html {
+    color-scheme: dark;
+  }
+}
