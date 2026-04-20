@@ -1,0 +1,56 @@
+# Root .gitignore
+
+# Environment Variables (SENSITIVE - DO NOT COMMIT)
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+.env.test
+
+# Dependencies
+node_modules/
+yarn.lock
+package-lock.json
+pnpm-lock.yaml
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.env.*.swp
+.env.*.swo
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage/
+.nyc_output/
+
+# Temporary
+tmp/
+temp/
+*.tmp
+
+# Keep example env files
+!.env.example
+!.env.*.example
