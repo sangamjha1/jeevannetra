@@ -67,6 +67,12 @@ export class User {
   @Column({ type: 'json', nullable: true })
   emergencyContacts: Array<{ name: string; phone: string }>;
 
+  @Column({ nullable: true })
+  passwordResetCode: string;
+
+  @Column({ type: 'timestamp', nullable: true })
+  passwordResetCodeExpiry: Date;
+
   @CreateDateColumn()
   createdAt: Date;
 

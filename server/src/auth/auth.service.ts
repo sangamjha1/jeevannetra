@@ -125,23 +125,37 @@ export class AuthService {
     // Generate random 6-character reset code
     const resetCode = Math.random().toString(36).substring(2, 8).toUpperCase();
     
-    // In production, this would be sent via email
-    // For now, store it in memory (will be cleared on restart)
-    (global as any).resetCodes = (global as any).resetCodes || {};
-    (global as any).resetCodes[email] = resetCode;
+    // Set expiry to 15 minutes from now
+    const expiryTime = new Date(Date.now() + 15 * 60 * 1000);
 
-    console.log(`\n✅ PASSWORD RESET CODE FOR ${email}:`);
-    console.log(`   Code: ${resetCode}`);
-    console.log(`   (This is a demo - in production, code would be sent via email)\n`);
+    // Save to database
+    await this.usersService.update(user.id, {
+      passwordResetCode: resetCode,
+      passwordResetCodeExpiry: expiryTime,
+    } as any);
+
+    // Log for local testing
+    this.logger.log(`\n✅ PASSWORD RESET CODE FOR ${email}:`);
+    this.logger.log(`   Code: ${resetCode}`);
+    this.logger.log(`   Expires in: 15 minutes`);
+    this.logger.log(`   (In production, this would be sent via email)\n`);
 
     return { success: true, message: 'If an account exists with this email, a reset code has been sent.' };
   }
 
   async verifyResetCode(email: string, code: string) {
-    const storedCode = (global as any).resetCodes?.[email];
-    
-    if (!storedCode || storedCode !== code.toUpperCase()) {
-      throw new UnauthorizedException('Invalid or expired reset code');
+    const user = await this.usersService.findByEmail(email);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    // Check if code matches and hasn't expired
+    if (!user.passwordResetCode || user.passwordResetCode !== code.toUpperCase()) {
+      throw new UnauthorizedException('Invalid reset code');
+    }
+
+    if (!user.passwordResetCodeExpiry || new Date() > user.passwordResetCodeExpiry) {
+      throw new UnauthorizedException('Reset code has expired. Request a new one.');
     }
 
     return { success: true, message: 'Reset code verified. You can now set a new password.' };
@@ -153,21 +167,26 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
-    const storedCode = (global as any).resetCodes?.[email];
-    if (!storedCode || storedCode !== code.toUpperCase()) {
-      throw new UnauthorizedException('Invalid or expired reset code');
+    // Verify code is valid and not expired
+    if (!user.passwordResetCode || user.passwordResetCode !== code.toUpperCase()) {
+      throw new UnauthorizedException('Invalid reset code');
+    }
+
+    if (!user.passwordResetCodeExpiry || new Date() > user.passwordResetCodeExpiry) {
+      throw new UnauthorizedException('Reset code has expired. Request a new one.');
     }
 
     // Hash new password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    // Update user password
-    await this.usersService.update(user.id, { password: hashedPassword } as any);
+    // Update user password and clear reset code
+    await this.usersService.update(user.id, {
+      password: hashedPassword,
+      passwordResetCode: null,
+      passwordResetCodeExpiry: null,
+    } as any);
 
-    // Clear reset code
-    delete (global as any).resetCodes[email];
-
-    console.log(`✅ Password reset successful for ${email}`);
+    this.logger.log(`✅ Password reset successful for ${email}`);
 
     return { success: true, message: 'Password has been reset successfully. You can now login with your new password.' };
   }
