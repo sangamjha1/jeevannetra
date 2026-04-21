@@ -1,7 +1,8 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
 import * as bcrypt from 'bcrypt';
+import * as sgMail from '@sendgrid/mail';
 import { Role, User } from '../users/entities/user.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -9,12 +10,19 @@ import { Patient } from '../patients/entities/patient.entity';
 
 @Injectable()
 export class AuthService {
+  private logger = new Logger('AuthService');
+
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
     @InjectRepository(Patient)
     private patientRepository: Repository<Patient>,
-  ) {}
+  ) {
+    // Initialize SendGrid
+    if (process.env.SENDGRID_API_KEY) {
+      sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+    }
+  }
 
   async signup(data: any): Promise<User> {
     const existingUser = await this.usersService.findByEmail(data.email);
@@ -134,11 +142,41 @@ export class AuthService {
       passwordResetCodeExpiry: expiryTime,
     } as any);
 
-    // Log for local testing
-    this.logger.log(`\n✅ PASSWORD RESET CODE FOR ${email}:`);
-    this.logger.log(`   Code: ${resetCode}`);
-    this.logger.log(`   Expires in: 15 minutes`);
-    this.logger.log(`   (In production, this would be sent via email)\n`);
+    // Send email via SendGrid
+    try {
+      if (process.env.SENDGRID_API_KEY && process.env.SENDGRID_FROM_EMAIL) {
+        await sgMail.send({
+          to: email,
+          from: {
+            email: process.env.SENDGRID_FROM_EMAIL,
+            name: 'JeevanNetra Hospital', // Alias - hides personal email
+          },
+          subject: 'Password Reset Code - JeevanNetra Hospital',
+          text: `Hello ${user.firstName || 'User'},\n\nYour password reset code is: ${resetCode}\n\nThis code will expire in 15 minutes.\n\nIf you didn't request a password reset, please ignore this email.\n\nBest regards,\nJeevanNetra Hospital Team`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #333;">Password Reset Code</h2>
+              <p>Hello ${user.firstName || 'User'},</p>
+              <p>Your password reset code is:</p>
+              <h1 style="color: #007bff; letter-spacing: 2px; font-size: 32px;">${resetCode}</h1>
+              <p style="color: #666;">This code will expire in <strong>15 minutes</strong>.</p>
+              <p style="color: #999; font-size: 12px; margin-top: 30px;">If you didn't request a password reset, please ignore this email.</p>
+              <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+              <p style="color: #999; font-size: 12px;">JeevanNetra Hospital Team</p>
+            </div>
+          `,
+        });
+        this.logger.log(`✅ Password reset email sent to ${email}`);
+      } else {
+        // Fallback to console logging if SendGrid not configured
+        this.logger.log(`\n⚠️  SendGrid not configured. Reset code for ${email}:`);
+        this.logger.log(`   Code: ${resetCode}`);
+        this.logger.log(`   Expires in: 15 minutes\n`);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to send password reset email to ${email}:`, error);
+      // Continue anyway - user can still use the code from logs in dev
+    }
 
     return { success: true, message: 'If an account exists with this email, a reset code has been sent.' };
   }
