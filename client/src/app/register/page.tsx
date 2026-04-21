@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { LegalModal } from "@/components/legal/LegalModal";
+import { TERMS_AND_CONDITIONS, PRIVACY_POLICY, LEGAL_TENDER } from "@/lib/legal-content";
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -25,16 +27,37 @@ export default function RegisterPage() {
     weight: "",
     emergencyContact: "",
   });
+  const [legalCheckboxes, setLegalCheckboxes] = useState({
+    termsAccepted: false,
+    privacyAccepted: false,
+    legalAccepted: false,
+  });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [modals, setModals] = useState({
+    termsOpen: false,
+    privacyOpen: false,
+    legalOpen: false,
+  });
   const router = useRouter();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.id]: e.target.value });
   };
 
+  const handleCheckboxChange = (key: keyof typeof legalCheckboxes) => {
+    setLegalCheckboxes({ ...legalCheckboxes, [key]: !legalCheckboxes[key] });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate legal checkboxes
+    if (!legalCheckboxes.termsAccepted || !legalCheckboxes.privacyAccepted || !legalCheckboxes.legalAccepted) {
+      setError("You must accept all terms and conditions to continue");
+      return;
+    }
+
     setLoading(true);
     setError("");
 
@@ -56,7 +79,7 @@ export default function RegisterPage() {
           <CardDescription>Register to start using the hospital system</CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
-          <CardContent className="grid gap-4 sm:grid-cols-2 max-h-96 overflow-y-auto">
+          <CardContent className="grid gap-4 sm:grid-cols-2 max-h-[70vh] overflow-y-auto">
             {error && <div className="sm:col-span-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
             
             {/* Basic Info */}
@@ -157,9 +180,74 @@ export default function RegisterPage() {
               <Label htmlFor="weight">Weight (kg)</Label>
               <Input id="weight" type="number" step="0.1" value={formData.weight} onChange={handleChange} placeholder="70" />
             </div>
+
+            {/* Legal Checkboxes */}
+            <div className="sm:col-span-2 space-y-3 pt-4 border-t border-border/40">
+              <Label className="text-base font-semibold">Legal Requirements *</Label>
+              
+              <div className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  id="terms"
+                  checked={legalCheckboxes.termsAccepted}
+                  onChange={() => handleCheckboxChange('termsAccepted')}
+                  className="mt-1 w-4 h-4 rounded border-border"
+                />
+                <label htmlFor="terms" className="text-sm text-foreground flex items-center gap-2 cursor-pointer">
+                  I accept the{" "}
+                  <button
+                    type="button"
+                    onClick={() => setModals({ ...modals, termsOpen: true })}
+                    className="text-primary hover:underline font-medium"
+                  >
+                    Terms and Conditions
+                  </button>
+                </label>
+              </div>
+
+              <div className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  id="privacy"
+                  checked={legalCheckboxes.privacyAccepted}
+                  onChange={() => handleCheckboxChange('privacyAccepted')}
+                  className="mt-1 w-4 h-4 rounded border-border"
+                />
+                <label htmlFor="privacy" className="text-sm text-foreground flex items-center gap-2 cursor-pointer">
+                  I accept the{" "}
+                  <button
+                    type="button"
+                    onClick={() => setModals({ ...modals, privacyOpen: true })}
+                    className="text-primary hover:underline font-medium"
+                  >
+                    Privacy Policy
+                  </button>
+                </label>
+              </div>
+
+              <div className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  id="legal"
+                  checked={legalCheckboxes.legalAccepted}
+                  onChange={() => handleCheckboxChange('legalAccepted')}
+                  className="mt-1 w-4 h-4 rounded border-border"
+                />
+                <label htmlFor="legal" className="text-sm text-foreground flex items-center gap-2 cursor-pointer">
+                  I accept the{" "}
+                  <button
+                    type="button"
+                    onClick={() => setModals({ ...modals, legalOpen: true })}
+                    className="text-primary hover:underline font-medium"
+                  >
+                    Legal Tender & Liability
+                  </button>
+                </label>
+              </div>
+            </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-3">
-            <Button className="w-full" type="submit" disabled={loading}>
+            <Button className="w-full" type="submit" disabled={loading || !legalCheckboxes.termsAccepted || !legalCheckboxes.privacyAccepted || !legalCheckboxes.legalAccepted}>
               {loading ? "Creating account..." : "Create account"}
             </Button>
             <p className="text-center text-sm text-muted-foreground">
@@ -168,6 +256,26 @@ export default function RegisterPage() {
           </CardFooter>
         </form>
       </Card>
+
+      {/* Legal Modals */}
+      <LegalModal
+        isOpen={modals.termsOpen}
+        onClose={() => setModals({ ...modals, termsOpen: false })}
+        title="Terms and Conditions"
+        content={TERMS_AND_CONDITIONS}
+      />
+      <LegalModal
+        isOpen={modals.privacyOpen}
+        onClose={() => setModals({ ...modals, privacyOpen: false })}
+        title="Privacy Policy"
+        content={PRIVACY_POLICY}
+      />
+      <LegalModal
+        isOpen={modals.legalOpen}
+        onClose={() => setModals({ ...modals, legalOpen: false })}
+        title="Legal Tender & Liability"
+        content={LEGAL_TENDER}
+      />
     </div>
   );
 }

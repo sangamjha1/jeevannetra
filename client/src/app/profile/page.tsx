@@ -3,11 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/lib/api';
-import { useTheme } from 'next-themes';
 import { 
   User, 
-  Moon, 
-  Sun, 
   LogOut, 
   ChevronRight,
   Heart,
@@ -19,10 +16,13 @@ import {
   Edit2,
   X,
   AlertTriangle,
+  FileText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmergencyContactsManager } from '@/components/profile/EmergencyContactsManager';
+import { LegalModal } from '@/components/legal/LegalModal';
+import { TERMS_AND_CONDITIONS, PRIVACY_POLICY, LEGAL_TENDER } from '@/lib/legal-content';
 import { cn } from '@/lib/utils';
 
 interface PatientData {
@@ -52,7 +52,6 @@ interface PatientData {
 
 const ProfilePage = () => {
   const { user, logout, isLoading } = useAuth();
-  const { theme, setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState('personal');
   const [patientData, setPatientData] = useState<PatientData | null>(null);
@@ -63,6 +62,11 @@ const ProfilePage = () => {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [legalModals, setLegalModals] = useState({
+    termsOpen: false,
+    privacyOpen: false,
+    legalOpen: false,
+  });
 
   useEffect(() => {
     setMounted(true);
@@ -146,7 +150,7 @@ const ProfilePage = () => {
     { id: 'medical', label: 'Medical Details', icon: Heart },
     { id: 'emergency', label: 'Emergency Contacts', icon: AlertTriangle },
     { id: 'security', label: 'Security', icon: Lock },
-    { id: 'appearance', label: 'Appearance', icon: Sun },
+    { id: 'legal', label: 'Legal & Policies', icon: FileText },
   ];
 
   const InputField = ({ label, value, onChange, type = 'text' }: any) => (
@@ -377,31 +381,52 @@ const ProfilePage = () => {
                   </div>
                 )}
 
-                {/* Appearance Settings */}
-                {activeTab === 'appearance' && (
+                {/* Legal & Policies */}
+                {activeTab === 'legal' && (
                   <div className="space-y-6">
-                    <h3 className="text-lg font-semibold">Theme Preference</h3>
-                    <div className="grid grid-cols-3 gap-4">
-                      {['light', 'dark', 'system'].map((t) => (
-                        <button
-                          key={t}
-                          onClick={() => setTheme(t)}
-                          className={cn(
-                            'p-4 rounded-lg border-2 transition-all flex flex-col items-center gap-2',
-                            theme === t
-                              ? 'border-primary bg-primary/10'
-                              : 'border-border/40 hover:border-border/60'
-                          )}
-                        >
-                          {t === 'light' && <Sun className="h-6 w-6 text-amber-400" />}
-                          {t === 'dark' && <Moon className="h-6 w-6 text-blue-400" />}
-                          {t === 'system' && <Sun className="h-6 w-6 text-muted-foreground" />}
-                          <span className="text-sm font-medium capitalize">{t}</span>
-                        </button>
-                      ))}
+                    <h3 className="text-lg font-semibold flex items-center gap-2"><FileText className="h-5 w-5 text-primary" /> Legal Documents & Policies</h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* Terms and Conditions */}
+                      <button
+                        onClick={() => setLegalModals({ ...legalModals, termsOpen: true })}
+                        className="p-6 rounded-lg border border-border/40 bg-card hover:bg-muted/50 hover:border-primary/50 transition-all text-left"
+                      >
+                        <FileText className="h-6 w-6 text-blue-500 mb-3" />
+                        <h4 className="font-semibold text-foreground mb-2">Terms and Conditions</h4>
+                        <p className="text-sm text-muted-foreground">Read our terms of service and usage guidelines</p>
+                        <span className="inline-block mt-3 text-xs text-primary font-medium">Click to view →</span>
+                      </button>
+
+                      {/* Privacy Policy */}
+                      <button
+                        onClick={() => setLegalModals({ ...legalModals, privacyOpen: true })}
+                        className="p-6 rounded-lg border border-border/40 bg-card hover:bg-muted/50 hover:border-primary/50 transition-all text-left"
+                      >
+                        <FileText className="h-6 w-6 text-green-500 mb-3" />
+                        <h4 className="font-semibold text-foreground mb-2">Privacy Policy</h4>
+                        <p className="text-sm text-muted-foreground">Learn how we collect and protect your data</p>
+                        <span className="inline-block mt-3 text-xs text-primary font-medium">Click to view →</span>
+                      </button>
+
+                      {/* Legal Tender & Liability */}
+                      <button
+                        onClick={() => setLegalModals({ ...legalModals, legalOpen: true })}
+                        className="p-6 rounded-lg border border-border/40 bg-card hover:bg-muted/50 hover:border-primary/50 transition-all text-left"
+                      >
+                        <FileText className="h-6 w-6 text-amber-500 mb-3" />
+                        <h4 className="font-semibold text-foreground mb-2">Legal Tender & Liability</h4>
+                        <p className="text-sm text-muted-foreground">Understand our disclaimers and liability limits</p>
+                        <span className="inline-block mt-3 text-xs text-primary font-medium">Click to view →</span>
+                      </button>
                     </div>
-                    <div className="p-4 rounded-lg bg-muted/30 border border-border/40">
-                      <p className="text-sm text-muted-foreground">Current Theme: <span className="font-semibold text-foreground capitalize">{resolvedTheme || 'system'}</span></p>
+
+                    <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 flex items-start gap-3">
+                      <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                      <div className="text-sm text-blue-600 dark:text-blue-400">
+                        <p className="font-medium mb-1">Important Information</p>
+                        <p>These documents were last updated on April 21, 2026. We recommend reviewing them periodically for any updates or changes.</p>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -411,6 +436,26 @@ const ProfilePage = () => {
           </div>
 
         </div>
+
+        {/* Legal Modals */}
+        <LegalModal
+          isOpen={legalModals.termsOpen}
+          onClose={() => setLegalModals({ ...legalModals, termsOpen: false })}
+          title="Terms and Conditions"
+          content={TERMS_AND_CONDITIONS}
+        />
+        <LegalModal
+          isOpen={legalModals.privacyOpen}
+          onClose={() => setLegalModals({ ...legalModals, privacyOpen: false })}
+          title="Privacy Policy"
+          content={PRIVACY_POLICY}
+        />
+        <LegalModal
+          isOpen={legalModals.legalOpen}
+          onClose={() => setLegalModals({ ...legalModals, legalOpen: false })}
+          title="Legal Tender & Liability"
+          content={LEGAL_TENDER}
+        />
     </div>
   );
 };
