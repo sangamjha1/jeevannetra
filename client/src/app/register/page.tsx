@@ -15,6 +15,7 @@ export default function RegisterPage() {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
+    confirmPassword: "",
     firstName: "",
     lastName: "",
     phone: "",
@@ -52,6 +53,27 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Password validation for new registration
+    if (formData.password.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
+
+    if (!/[A-Z]/.test(formData.password)) {
+      setError("Password must contain at least one uppercase letter");
+      return;
+    }
+
+    if (!/[0-9]/.test(formData.password)) {
+      setError("Password must contain at least one number");
+      return;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+    
     // Validate legal checkboxes
     if (!legalCheckboxes.termsAccepted || !legalCheckboxes.privacyAccepted || !legalCheckboxes.legalAccepted) {
       setError("You must accept all terms and conditions to continue");
@@ -62,7 +84,10 @@ export default function RegisterPage() {
     setError("");
 
     try {
-      await api.post("/auth/signup", formData);
+      // Remove confirmPassword before sending to API
+      const signupData = { ...formData };
+      delete (signupData as any).confirmPassword;
+      await api.post("/auth/signup", signupData);
       router.push("/login?registered=true");
     } catch (err: any) {
       setError(err.response?.data?.message || "Registration failed");
@@ -98,6 +123,11 @@ export default function RegisterPage() {
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="password">Password *</Label>
               <Input id="password" type="password" required value={formData.password} onChange={handleChange} placeholder="••••••••" />
+              <p className="text-xs text-muted-foreground">At least 8 characters, 1 uppercase letter, and 1 number</p>
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="confirmPassword">Confirm Password *</Label>
+              <Input id="confirmPassword" type="password" required value={(formData as any).confirmPassword} onChange={handleChange} placeholder="••••••••" />
             </div>
             
             {/* Contact Info */}

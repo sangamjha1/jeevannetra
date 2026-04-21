@@ -87,16 +87,6 @@ export default function ForgotPasswordPage() {
       return;
     }
 
-    if (!/[A-Z]/.test(newPassword)) {
-      setError("Password must contain at least one uppercase letter");
-      return;
-    }
-
-    if (!/[0-9]/.test(newPassword)) {
-      setError("Password must contain at least one number");
-      return;
-    }
-
     setLoading(true);
     setError("");
     setMessage("");
