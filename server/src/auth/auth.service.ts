@@ -149,10 +149,10 @@ export class AuthService {
           to: email,
           from: {
             email: process.env.SENDGRID_FROM_EMAIL,
-            name: 'JeevanNetra Hospital', // Alias - hides personal email
+            name: 'JeevanNetra HMS', // Alias - hides personal email
           },
-          subject: 'Password Reset Code - JeevanNetra Hospital',
-          text: `Hello ${user.firstName || 'User'},\n\nYour password reset code is: ${resetCode}\n\nThis code will expire in 15 minutes.\n\nIf you didn't request a password reset, please ignore this email.\n\nBest regards,\nJeevanNetra Hospital Team`,
+          subject: 'Password Reset Code - JeevanNetra HMS',
+          text: `Hello ${user.firstName || 'User'},\n\nYour password reset code is: ${resetCode}\n\nThis code will expire in 15 minutes.\n\nIf you didn't request a password reset, please ignore this email.\n\nBest regards,\nJeevanNetra HMS Team`,
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
               <h2 style="color: #333;">Password Reset Code</h2>
@@ -162,7 +162,7 @@ export class AuthService {
               <p style="color: #666;">This code will expire in <strong>15 minutes</strong>.</p>
               <p style="color: #999; font-size: 12px; margin-top: 30px;">If you didn't request a password reset, please ignore this email.</p>
               <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-              <p style="color: #999; font-size: 12px;">JeevanNetra Hospital Team</p>
+              <p style="color: #999; font-size: 12px;">JeevanNetra HMS Team</p>
             </div>
           `,
         });
