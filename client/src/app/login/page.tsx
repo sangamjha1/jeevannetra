@@ -35,23 +35,23 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-br from-background via-background to-background" suppressHydrationWarning>
-      <Card className="w-full max-w-2xl border-slate-200 shadow-lg">
-        <CardHeader className="space-y-1 text-center">
+      <Card className="w-full max-w-2xl border-slate-200 shadow-lg" suppressHydrationWarning>
+        <CardHeader className="space-y-1 text-center" suppressHydrationWarning>
           <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary via-accent to-purple-400 bg-clip-text text-transparent">
             Jeevan Netra
           </CardTitle>
           <CardDescription>Jeevan Netra - Healthcare Management System</CardDescription>
         </CardHeader>
-        <div className="p-6 max-w-md mx-auto">
+        <div className="p-6 max-w-md mx-auto" suppressHydrationWarning>
           {/* Login Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4" suppressHydrationWarning>
             {error && <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
-            <div className="space-y-2">
+            <div className="space-y-2" suppressHydrationWarning>
               <Label htmlFor="email">Email</Label>
               <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
+            <div className="space-y-2" suppressHydrationWarning>
+              <div className="flex items-center justify-between" suppressHydrationWarning>
                 <Label htmlFor="password">Password</Label>
                 <Link href="/forgot-password" className="text-xs text-primary hover:underline">
                   Forgot password?
@@ -59,7 +59,7 @@ export default function LoginPage() {
               </div>
               <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
-            <Button className="w-full" type="submit" disabled={loading}>
+            <Button className="w-full" type="submit" disabled={loading} suppressHydrationWarning>
               {loading ? "Signing in..." : "Sign in"}
             </Button>
             <p className="text-center text-sm text-muted-foreground">
