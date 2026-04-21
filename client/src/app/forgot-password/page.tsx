@@ -89,8 +89,8 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-br from-background via-background to-background" suppressHydrationWarning>
-      <Card className="w-full max-w-md border-slate-200 shadow-lg">
-        <CardHeader className="space-y-1 text-center">
+      <Card className="w-full max-w-md border-slate-200 shadow-lg" suppressHydrationWarning>
+        <CardHeader className="space-y-1 text-center" suppressHydrationWarning>
           <Link href="/login" className="inline-flex items-center gap-2 text-sm text-primary hover:underline mb-4">
             <ArrowLeft className="h-4 w-4" />
             Back to Login
@@ -98,10 +98,10 @@ export default function ForgotPasswordPage() {
           <CardTitle className="text-2xl font-bold">Reset Password</CardTitle>
           <CardDescription>Enter your email to receive a reset code</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4" suppressHydrationWarning>
           {/* Success Message */}
           {message && (
-            <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800 flex items-start gap-2">
+            <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800 flex items-start gap-2" suppressHydrationWarning>
               <CheckCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" />
               <p className="text-sm text-emerald-600 dark:text-emerald-400">{message}</p>
             </div>
@@ -109,7 +109,7 @@ export default function ForgotPasswordPage() {
 
           {/* Error Message */}
           {error && (
-            <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 flex items-start gap-2">
+            <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 flex items-start gap-2" suppressHydrationWarning>
               <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
               <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
             </div>
@@ -117,8 +117,8 @@ export default function ForgotPasswordPage() {
 
           {/* Step 1: Email */}
           {step === 'email' && (
-            <form onSubmit={handleEmailSubmit} className="space-y-4">
-              <div className="space-y-2">
+            <form onSubmit={handleEmailSubmit} className="space-y-4" suppressHydrationWarning>
+              <div className="space-y-2" suppressHydrationWarning>
                 <Label htmlFor="email">Email Address</Label>
                 <Input
                   id="email"
@@ -129,7 +129,7 @@ export default function ForgotPasswordPage() {
                   required
                 />
               </div>
-              <Button className="w-full" type="submit" disabled={loading}>
+              <Button className="w-full" type="submit" disabled={loading} suppressHydrationWarning>
                 {loading ? "Sending..." : "Send Reset Code"}
               </Button>
             </form>
@@ -137,8 +137,8 @@ export default function ForgotPasswordPage() {
 
           {/* Step 2: Code Verification */}
           {step === 'code' && (
-            <form onSubmit={handleCodeVerify} className="space-y-4">
-              <div className="space-y-2">
+            <form onSubmit={handleCodeVerify} className="space-y-4" suppressHydrationWarning>
+              <div className="space-y-2" suppressHydrationWarning>
                 <Label htmlFor="resetCode">Reset Code</Label>
                 <Input
                   id="resetCode"
@@ -150,13 +150,14 @@ export default function ForgotPasswordPage() {
                   maxLength={6}
                 />
               </div>
-              <Button className="w-full" type="submit" disabled={loading}>
+              <Button className="w-full" type="submit" disabled={loading} suppressHydrationWarning>
                 {loading ? "Verifying..." : "Verify Code"}
               </Button>
               <button
                 type="button"
                 onClick={() => setStep('email')}
                 className="w-full text-sm text-muted-foreground hover:text-foreground"
+                suppressHydrationWarning
               >
                 Didn't receive code? Go back
               </button>
@@ -165,8 +166,8 @@ export default function ForgotPasswordPage() {
 
           {/* Step 3: New Password */}
           {step === 'password' && (
-            <form onSubmit={handlePasswordReset} className="space-y-4">
-              <div className="space-y-2">
+            <form onSubmit={handlePasswordReset} className="space-y-4" suppressHydrationWarning>
+              <div className="space-y-2" suppressHydrationWarning>
                 <Label htmlFor="newPassword">New Password</Label>
                 <Input
                   id="newPassword"
@@ -177,7 +178,7 @@ export default function ForgotPasswordPage() {
                   required
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2" suppressHydrationWarning>
                 <Label htmlFor="confirmPassword">Confirm Password</Label>
                 <Input
                   id="confirmPassword"
@@ -188,7 +189,7 @@ export default function ForgotPasswordPage() {
                   required
                 />
               </div>
-              <Button className="w-full" type="submit" disabled={loading}>
+              <Button className="w-full" type="submit" disabled={loading} suppressHydrationWarning>
                 {loading ? "Resetting..." : "Reset Password"}
               </Button>
             </form>

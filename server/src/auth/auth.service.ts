@@ -2,7 +2,7 @@ import { Injectable, UnauthorizedException, ConflictException, Logger } from '@n
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
 import * as bcrypt from 'bcrypt';
-import { Resend } from 'resend';
+import * as nodemailer from 'nodemailer';
 import { Role, User } from '../users/entities/user.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -11,7 +11,7 @@ import { Patient } from '../patients/entities/patient.entity';
 @Injectable()
 export class AuthService {
   private logger = new Logger('AuthService');
-  private resend: Resend;
+  private transporter: nodemailer.Transporter;
 
   constructor(
     private usersService: UsersService,
@@ -19,9 +19,17 @@ export class AuthService {
     @InjectRepository(Patient)
     private patientRepository: Repository<Patient>,
   ) {
-    // Initialize Resend
-    if (process.env.RESEND_API_KEY) {
-      this.resend = new Resend(process.env.RESEND_API_KEY);
+    // Initialize SMTP transporter
+    if (process.env.SMTP_HOST && process.env.SMTP_PASSWORD) {
+      this.transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: parseInt(process.env.SMTP_PORT || '465', 10),
+        secure: true, // true for port 465
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASSWORD,
+        },
+      });
     }
   }
 
@@ -143,11 +151,11 @@ export class AuthService {
       passwordResetCodeExpiry: expiryTime,
     } as any);
 
-    // Send email via Resend
+    // Send email via SMTP
     try {
-      if (this.resend && process.env.RESEND_FROM_EMAIL) {
-        await this.resend.emails.send({
-          from: `JeevanNetra HMS <${process.env.RESEND_FROM_EMAIL}>`,
+      if (this.transporter && process.env.SMTP_FROM_EMAIL) {
+        await this.transporter.sendMail({
+          from: `JeevanNetra HMS <${process.env.SMTP_FROM_EMAIL}>`,
           to: email,
           subject: 'Password Reset Code - JeevanNetra HMS',
           html: `
@@ -182,8 +190,8 @@ export class AuthService {
         });
         this.logger.log(`✅ Password reset email sent to ${email}`);
       } else {
-        // Fallback to console logging if Resend not configured
-        this.logger.log(`\n⚠️  Resend not configured. Reset code for ${email}:`);
+        // Fallback to console logging if SMTP not configured
+        this.logger.log(`\n⚠️  SMTP not configured. Reset code for ${email}:`);
         this.logger.log(`   Code: ${resetCode}`);
         this.logger.log(`   Expires in: 15 minutes\n`);
       }
