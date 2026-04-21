@@ -114,4 +114,61 @@ export class AuthService {
   async logout(userId: string) {
     return this.usersService.setRefreshToken(userId, null);
   }
+
+  async forgotPassword(email: string) {
+    const user = await this.usersService.findByEmail(email);
+    if (!user) {
+      // Don't reveal if email exists for security
+      return { success: true, message: 'If an account exists with this email, a reset code has been sent.' };
+    }
+
+    // Generate random 6-character reset code
+    const resetCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    
+    // In production, this would be sent via email
+    // For now, store it in memory (will be cleared on restart)
+    (global as any).resetCodes = (global as any).resetCodes || {};
+    (global as any).resetCodes[email] = resetCode;
+
+    console.log(`\n✅ PASSWORD RESET CODE FOR ${email}:`);
+    console.log(`   Code: ${resetCode}`);
+    console.log(`   (This is a demo - in production, code would be sent via email)\n`);
+
+    return { success: true, message: 'If an account exists with this email, a reset code has been sent.' };
+  }
+
+  async verifyResetCode(email: string, code: string) {
+    const storedCode = (global as any).resetCodes?.[email];
+    
+    if (!storedCode || storedCode !== code.toUpperCase()) {
+      throw new UnauthorizedException('Invalid or expired reset code');
+    }
+
+    return { success: true, message: 'Reset code verified. You can now set a new password.' };
+  }
+
+  async resetPassword(email: string, code: string, newPassword: string) {
+    const user = await this.usersService.findByEmail(email);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const storedCode = (global as any).resetCodes?.[email];
+    if (!storedCode || storedCode !== code.toUpperCase()) {
+      throw new UnauthorizedException('Invalid or expired reset code');
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update user password
+    await this.usersService.update(user.id, { password: hashedPassword } as any);
+
+    // Clear reset code
+    delete (global as any).resetCodes[email];
+
+    console.log(`✅ Password reset successful for ${email}`);
+
+    return { success: true, message: 'Password has been reset successfully. You can now login with your new password.' };
+  }
 }
