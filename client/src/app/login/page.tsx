@@ -22,12 +22,26 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
 
+    // Client-side validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError("Invalid email format");
+      setLoading(false);
+      return;
+    }
+
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters");
+      setLoading(false);
+      return;
+    }
+
     try {
       const response = await api.post("/auth/login", { email, password });
       const { accessToken, refreshToken, user } = response.data;
       login(accessToken, refreshToken, user);
     } catch (err: any) {
-      setError(err.response?.data?.message || "Invalid credentials");
+      setError(err.response?.data?.message || "Invalid email or password");
     } finally {
       setLoading(false);
     }
@@ -51,13 +65,11 @@ export default function LoginPage() {
               <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
             <div className="space-y-2" suppressHydrationWarning>
-              <div className="flex items-center justify-between" suppressHydrationWarning>
-                <Label htmlFor="password">Password</Label>
-                <Link href="/forgot-password" className="text-xs text-primary hover:underline">
-                  Forgot password?
-                </Link>
-              </div>
+              <Label htmlFor="password">Password</Label>
               <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+              <Link href="/forgot-password" className="text-xs text-primary hover:underline">
+                Forgot password?
+              </Link>
             </div>
             <Button className="w-full" type="submit" disabled={loading} suppressHydrationWarning>
               {loading ? "Signing in..." : "Sign in"}

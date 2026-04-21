@@ -11,7 +11,7 @@ import { Patient } from '../patients/entities/patient.entity';
 @Injectable()
 export class AuthService {
   private logger = new Logger('AuthService');
-  private transporter: nodemailer.Transporter;
+  private transporter?: nodemailer.Transporter;
 
   constructor(
     private usersService: UsersService,
@@ -30,6 +30,9 @@ export class AuthService {
           pass: process.env.SMTP_PASSWORD,
         },
       });
+      this.logger.log(`✅ SMTP transporter initialized: ${process.env.SMTP_HOST}:${process.env.SMTP_PORT}`);
+    } else {
+      this.logger.warn(`⚠️ SMTP not configured - missing SMTP_HOST or SMTP_PASSWORD`);
     }
   }
 
@@ -133,11 +136,15 @@ export class AuthService {
   }
 
   async forgotPassword(email: string) {
+    this.logger.log(`🔍 Checking if user exists: ${email}`);
     const user = await this.usersService.findByEmail(email);
     if (!user) {
       // Don't reveal if email exists for security
+      this.logger.warn(`⚠️ Forgot password request for non-existent email: ${email}`);
       return { success: true, message: 'If an account exists with this email, a reset code has been sent.' };
     }
+
+    this.logger.log(`✅ User found: ${email} - generating reset code`);
 
     // Generate random 6-character reset code
     const resetCode = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -150,11 +157,13 @@ export class AuthService {
       passwordResetCode: resetCode,
       passwordResetCodeExpiry: expiryTime,
     } as any);
+    this.logger.log(`💾 Reset code saved to DB for ${email}. Code: ${resetCode}, Expires: ${expiryTime}`);
 
     // Send email via SMTP
     try {
       if (this.transporter && process.env.SMTP_FROM_EMAIL) {
-        await this.transporter.sendMail({
+        this.logger.log(`📧 Attempting to send email to: ${email}`);
+        const result = await this.transporter.sendMail({
           from: `JeevanNetra HMS <${process.env.SMTP_FROM_EMAIL}>`,
           to: email,
           subject: 'Password Reset Code - JeevanNetra HMS',
@@ -188,16 +197,18 @@ export class AuthService {
             </div>
           `,
         });
-        this.logger.log(`✅ Password reset email sent to ${email}`);
+        this.logger.log(`✅ Email sent successfully to ${email}. Message ID: ${result.messageId}`);
       } else {
-        // Fallback to console logging if SMTP not configured
-        this.logger.log(`\n⚠️  SMTP not configured. Reset code for ${email}:`);
+        this.logger.warn(`⚠️  Email NOT sent - transporter: ${!!this.transporter}, fromEmail: ${process.env.SMTP_FROM_EMAIL}`);
+        this.logger.log(`\n⚠️  FALLBACK: Reset code for ${email}:`);
         this.logger.log(`   Code: ${resetCode}`);
         this.logger.log(`   Expires in: 15 minutes\n`);
       }
     } catch (error) {
-      this.logger.error(`Failed to send password reset email to ${email}:`, error);
-      // Continue anyway - user can still use the code from logs in dev
+      this.logger.error(`❌ Failed to send email to ${email}:`, error);
+      this.logger.log(`\n⚠️  FALLBACK: Reset code for ${email}:`);
+      this.logger.log(`   Code: ${resetCode}`);
+      this.logger.log(`   Expires in: 15 minutes\n`);
     }
 
     return { success: true, message: 'If an account exists with this email, a reset code has been sent.' };

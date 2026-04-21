@@ -25,9 +25,17 @@ export default function ForgotPasswordPage() {
     setError("");
     setMessage("");
 
+    // Client-side validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError("Invalid email format");
+      setLoading(false);
+      return;
+    }
+
     try {
       await api.post("/auth/forgot-password", { email });
-      setMessage("Reset code sent to your email. Check your inbox.");
+      setMessage("Reset code sent to your email. Check your inbox and spam folder.");
       setStep('code');
     } catch (err: any) {
       setError(err.response?.data?.message || "Failed to process request");
@@ -42,12 +50,25 @@ export default function ForgotPasswordPage() {
     setError("");
     setMessage("");
 
+    if (resetCode.length !== 6) {
+      setError("Reset code must be 6 characters");
+      setLoading(false);
+      return;
+    }
+
     try {
       await api.post("/auth/verify-reset-code", { email, code: resetCode });
       setMessage("Code verified! Now create your new password.");
       setStep('password');
     } catch (err: any) {
-      setError(err.response?.data?.message || "Invalid reset code");
+      const errorMsg = err.response?.data?.message;
+      if (errorMsg?.includes("expired")) {
+        setError("Reset code has expired. Request a new one.");
+      } else if (errorMsg?.includes("Invalid")) {
+        setError("Invalid reset code. Please check and try again.");
+      } else {
+        setError(errorMsg || "Failed to verify code");
+      }
     } finally {
       setLoading(false);
     }
@@ -56,13 +77,23 @@ export default function ForgotPasswordPage() {
   const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (newPassword.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
+
     if (newPassword !== confirmPassword) {
       setError("Passwords do not match");
       return;
     }
 
-    if (newPassword.length < 8) {
-      setError("Password must be at least 8 characters");
+    if (!/[A-Z]/.test(newPassword)) {
+      setError("Password must contain at least one uppercase letter");
+      return;
+    }
+
+    if (!/[0-9]/.test(newPassword)) {
+      setError("Password must contain at least one number");
       return;
     }
 
@@ -81,7 +112,14 @@ export default function ForgotPasswordPage() {
         window.location.href = '/login';
       }, 2000);
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to reset password");
+      const errorMsg = err.response?.data?.message;
+      if (errorMsg?.includes("expired")) {
+        setError("Reset code has expired. Request a new one.");
+      } else if (errorMsg?.includes("Invalid")) {
+        setError("Invalid reset code. Request a new password reset.");
+      } else {
+        setError(errorMsg || "Failed to reset password");
+      }
     } finally {
       setLoading(false);
     }
