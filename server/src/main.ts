@@ -12,7 +12,7 @@ async function bootstrap() {
   // Validate critical environment variables
   const requiredEnvs = ['DATABASE_URL', 'JWT_SECRET'];
   const missingEnvs = requiredEnvs.filter((env) => !process.env[env]);
-  
+
   if (missingEnvs.length > 0) {
     logger.error(`MISSING REQUIRED ENVIRONMENT VARIABLES: ${missingEnvs.join(', ')}`);
     logger.error('Please check your .env file. The application cannot start safely without these.');
@@ -35,7 +35,7 @@ async function bootstrap() {
         'http://192.168.1.7:3000',
         /\.devtunnels\.ms$/,  // Allow all devtunnels.ms domains
       ];
-
+      /*
       // Add production frontend URL if configured
       if (process.env.FRONTEND_URL) {
         allowedOrigins.push(process.env.FRONTEND_URL);
@@ -47,6 +47,31 @@ async function bootstrap() {
         callback(null, true);
       } else {
         callback(new Error('CORS not allowed'));
+      }
+    },
+    credentials: true,
+  });
+    */
+      // Add production frontend URLs if configured
+      if (process.env.FRONTEND_URL) {
+        const origins = process.env.FRONTEND_URL
+          .split(",")
+          .map(origin => origin.trim());
+
+        allowedOrigins.push(...origins);
+      }
+
+      if (
+        !origin ||
+        allowedOrigins.some(allowed =>
+          typeof allowed === "string"
+            ? allowed === origin
+            : allowed.test(origin)
+        )
+      ) {
+        callback(null, true);
+      } else {
+        callback(new Error("CORS not allowed"));
       }
     },
     credentials: true,
@@ -71,7 +96,7 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3001;
   await app.listen(port);
-  
+
   logger.log(`🚀 Application is running on: http://localhost:${port}`);
   logger.log(`📚 Swagger documentation: http://localhost:${port}/api`);
 }
