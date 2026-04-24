@@ -24,7 +24,7 @@ export class UsersService {
 
   async findByEmailAndRole(email: string, role: string): Promise<User | null> {
     return this.userRepository.findOne({
-      where: { email, role },
+      where: { email, role: role as any },
       relations: ['patientProfile', 'doctorProfile', 'hospitalProfile', 'staffProfile'],
     });
   }
