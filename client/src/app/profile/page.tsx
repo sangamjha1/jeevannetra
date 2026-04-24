@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { MessageAlert } from '@/components/ui/message-alert';
 import { EmergencyContactsManager } from '@/components/profile/EmergencyContactsManager';
 import { LegalModal } from '@/components/legal/LegalModal';
 import { TERMS_AND_CONDITIONS, PRIVACY_POLICY, LEGAL_TENDER } from '@/lib/legal-content';
@@ -259,18 +260,8 @@ const ProfilePage = () => {
               <CardContent className="space-y-6">
                 
                 {/* Messages */}
-                {message && (
-                  <div className="p-4 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 flex items-center gap-2">
-                    <Check className="h-5 w-5" />
-                    {message}
-                  </div>
-                )}
-                {error && (
-                  <div className="p-4 rounded-lg bg-destructive/20 border border-destructive/30 text-destructive flex items-center gap-2">
-                    <AlertCircle className="h-5 w-5" />
-                    {error}
-                  </div>
-                )}
+                {message && <MessageAlert message={message} type="success" />}
+                {error && <MessageAlert message={error} type="error" />}
 
                 {/* Personal Info */}
                 {activeTab === 'personal' && (

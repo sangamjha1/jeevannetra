@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { MessageAlert } from "@/components/ui/message-alert";
 import { Plus, X, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -130,18 +131,9 @@ export function IssuePrescription() {
         <CardTitle>Issue Prescription</CardTitle>
       </CardHeader>
       <CardContent>
-        {success && (
-          <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 flex items-center gap-2">
-            <Check className="h-5 w-5" />
-            Prescription issued successfully!
-          </div>
-        )}
+        {success && <MessageAlert message="Prescription issued successfully!" type="success" />}
         
-        {error && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-            {error}
-          </div>
-        )}
+        {error && <MessageAlert message={error} type="error" />}
 
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Patient Selection */}

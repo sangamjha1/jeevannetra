@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { MessageAlert } from "@/components/ui/message-alert";
 import Link from "next/link";
 import { Eye, EyeOff, Loader } from "lucide-react";
 
@@ -85,7 +86,7 @@ export default function LoginPage() {
         <div className="p-6 max-w-md mx-auto" suppressHydrationWarning>
           {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-4" suppressHydrationWarning>
-            {error && <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+            {error && <MessageAlert message={error} type="error" />}
             <div className="space-y-2" suppressHydrationWarning>
               <Label htmlFor="email">Email</Label>
               <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />

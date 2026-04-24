@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { MessageAlert } from "@/components/ui/message-alert";
 import { Users, Bed, Plus, Trash2, Edit2 } from "lucide-react";
 
 interface Staff {
@@ -208,11 +209,7 @@ export function HospitalDashboard() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-              {error}
-            </div>
-          )}
+          {error && <MessageAlert message={error} type="error" />}
 
           {/* Add Staff Form */}
           {showForm && (

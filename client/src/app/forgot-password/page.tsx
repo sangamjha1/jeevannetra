@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { MessageAlert } from "@/components/ui/message-alert";
 import Link from "next/link";
-import { AlertCircle, CheckCircle, ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 export default function ForgotPasswordPage() {
   const [step, setStep] = useState<'email' | 'code' | 'password'>('email');
@@ -128,20 +129,10 @@ export default function ForgotPasswordPage() {
         </CardHeader>
         <CardContent className="space-y-4" suppressHydrationWarning>
           {/* Success Message */}
-          {message && (
-            <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800 flex items-start gap-2" suppressHydrationWarning>
-              <CheckCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-emerald-600 dark:text-emerald-400">{message}</p>
-            </div>
-          )}
+          {message && <MessageAlert message={message} type="success" />}
 
           {/* Error Message */}
-          {error && (
-            <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 flex items-start gap-2" suppressHydrationWarning>
-              <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-            </div>
-          )}
+          {error && <MessageAlert message={error} type="error" />}
 
           {/* Step 1: Email */}
           {step === 'email' && (

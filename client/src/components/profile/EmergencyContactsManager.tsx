@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Plus, Trash2, Edit2, Check, X, AlertCircle, Phone, User } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { MessageAlert } from '@/components/ui/message-alert';
 import api from '@/lib/api';
 import { cn } from '@/lib/utils';
 
@@ -92,18 +93,8 @@ export const EmergencyContactsManager: React.FC<EmergencyContactsManagerProps> =
       </div>
 
       {/* Messages */}
-      {message && (
-        <div className="flex gap-2 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 text-sm">
-          <Check className="h-4 w-4 flex-shrink-0 mt-0.5" />
-          {message}
-        </div>
-      )}
-      {error && (
-        <div className="flex gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-600 text-sm">
-          <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-          {error}
-        </div>
-      )}
+      {message && <MessageAlert message={message} type="success" />}
+      {error && <MessageAlert message={error} type="error" />}
 
       {/* Contacts List */}
       <div className="space-y-3">

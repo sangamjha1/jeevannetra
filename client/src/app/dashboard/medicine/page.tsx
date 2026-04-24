@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { MessageAlert } from "@/components/ui/message-alert";
 import { Loader2, Search } from "lucide-react";
 
 interface MedicineResult {
@@ -99,11 +100,7 @@ export default function MedicineSearchPage() {
       </Card>
 
       {error && (
-        <Card className="border-red-200 bg-red-50">
-          <CardContent className="pt-6">
-            <p className="text-sm text-red-600">❌ {error}</p>
-          </CardContent>
-        </Card>
+        <MessageAlert message={error} type="error" />
       )}
 
       {/* Did You Mean Suggestions */}

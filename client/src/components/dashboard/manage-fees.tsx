@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { MessageAlert } from "@/components/ui/message-alert";
 import { format } from "date-fns";
 import { TrendingUp, DollarSign, Plus } from "lucide-react";
 
@@ -160,23 +161,19 @@ export function ManageFees() {
       <CardContent className="space-y-4">
         {/* Stats */}
         <div className="grid grid-cols-2 gap-3 mb-4">
-          <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
-            <p className="text-xs text-emerald-700 font-semibold">Total Earnings</p>
-            <p className="text-2xl font-bold text-emerald-900 mt-1">
+          <div className="bg-green-950/40 border border-green-900/50 rounded-lg p-3">
+            <p className="text-xs text-green-400 font-semibold">Total Earnings</p>
+            <p className="text-2xl font-bold text-green-300 mt-1">
               ₹{calculateTotalEarnings().toFixed(2)}
             </p>
           </div>
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-            <p className="text-xs text-amber-700 font-semibold">Pending Payments</p>
-            <p className="text-2xl font-bold text-amber-900 mt-1">{calculatePending()}</p>
+          <div className="bg-amber-950/40 border border-amber-900/50 rounded-lg p-3">
+            <p className="text-xs text-amber-400 font-semibold">Pending Payments</p>
+            <p className="text-2xl font-bold text-amber-300 mt-1">{calculatePending()}</p>
           </div>
         </div>
 
-        {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-            {error}
-          </div>
-        )}
+        {error && <MessageAlert message={error} type="error" />}
 
         {/* Add Fee Form */}
         {showForm && (

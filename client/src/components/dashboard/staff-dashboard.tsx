@@ -5,6 +5,7 @@ import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { MessageAlert } from "@/components/ui/message-alert";
 import {
   Clock,
   Briefcase,
@@ -114,14 +115,7 @@ export function StaffDashboard() {
   if (error) {
     return (
       <div className="space-y-6">
-        <Card className="border-red-500 bg-red-50">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-red-600">
-              <AlertCircle className="h-5 w-5" />
-              <p>{error}</p>
-            </div>
-          </CardContent>
-        </Card>
+        <MessageAlert message={error} type="error" />
       </div>
     );
   }
