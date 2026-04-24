@@ -10,24 +10,17 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LegalModal } from "@/components/legal/LegalModal";
 import { TERMS_AND_CONDITIONS, PRIVACY_POLICY, LEGAL_TENDER } from "@/lib/legal-content";
-import { Mail, CheckCircle } from "lucide-react";
+import { Mail, CheckCircle, Loader } from "lucide-react";
 
 export default function RegisterPage() {
-  // Email Verification Step
-  const [step, setStep] = useState<"email" | "verification" | "form">("email");
-  const [emailForVerification, setEmailForVerification] = useState("");
-  const [verificationCode, setVerificationCode] = useState("");
-  const [verificationSent, setVerificationSent] = useState(false);
-  
-  // Form Data
   const [formData, setFormData] = useState({
     email: "",
+    role: "PATIENT",
     password: "",
     confirmPassword: "",
     firstName: "",
     lastName: "",
     phone: "",
-    role: "PATIENT",
     gender: "",
     dateOfBirth: "",
     address: "",
@@ -36,13 +29,19 @@ export default function RegisterPage() {
     weight: "",
     emergencyContact: "",
   });
-  
+
+  const [verificationState, setVerificationState] = useState({
+    step: "initial", // initial -> code-sent -> verified
+    code: "",
+    loading: false,
+  });
+
   const [legalCheckboxes, setLegalCheckboxes] = useState({
     termsAccepted: false,
     privacyAccepted: false,
     legalAccepted: false,
   });
-  
+
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [modals, setModals] = useState({
@@ -50,58 +49,8 @@ export default function RegisterPage() {
     privacyOpen: false,
     legalOpen: false,
   });
-  
+
   const router = useRouter();
-
-  // Step 1: Send verification email
-  const handleSendVerification = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    
-    if (!emailRegex.test(emailForVerification)) {
-      setError("Invalid email format");
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-
-    try {
-      await api.post("/auth/send-verification-email", { email: emailForVerification });
-      setVerificationSent(true);
-      setStep("verification");
-      setFormData({ ...formData, email: emailForVerification });
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to send verification email");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Step 2: Verify email code
-  const handleVerifyEmail = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (verificationCode.length < 6) {
-      setError("Verification code must be 6 characters");
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-
-    try {
-      await api.post("/auth/verify-email-code", {
-        email: emailForVerification,
-        code: verificationCode,
-      });
-      setStep("form");
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Invalid or expired verification code");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.id]: e.target.value });
@@ -111,10 +60,62 @@ export default function RegisterPage() {
     setLegalCheckboxes({ ...legalCheckboxes, [key]: !legalCheckboxes[key] });
   };
 
-  // Step 3: Complete registration
+  const handleSendVerificationCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailRegex.test(formData.email)) {
+      setError("Invalid email format");
+      return;
+    }
+
+    setVerificationState({ ...verificationState, loading: true });
+    setError("");
+
+    try {
+      await api.post("/auth/send-verification-email", {
+        email: formData.email,
+        role: formData.role,
+      });
+      setVerificationState({ ...verificationState, step: "code-sent", loading: false });
+    } catch (err: any) {
+      setError(err.response?.data?.message || "Failed to send verification code");
+      setVerificationState({ ...verificationState, loading: false });
+    }
+  };
+
+  const handleVerifyCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (verificationState.code.length < 6) {
+      setError("Verification code must be 6 characters");
+      return;
+    }
+
+    setVerificationState({ ...verificationState, loading: true });
+    setError("");
+
+    try {
+      await api.post("/auth/verify-email-code", {
+        email: formData.email,
+        code: verificationState.code,
+        role: formData.role,
+      });
+      setVerificationState({ ...verificationState, step: "verified", loading: false });
+    } catch (err: any) {
+      setError(err.response?.data?.message || "Invalid or expired verification code");
+      setVerificationState({ ...verificationState, loading: false });
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
+    if (verificationState.step !== "verified") {
+      setError("Please verify your email first");
+      return;
+    }
+
     // Password validation for new registration
     if (formData.password.length < 8) {
       setError("Password must be at least 8 characters");
@@ -135,7 +136,7 @@ export default function RegisterPage() {
       setError("Passwords do not match");
       return;
     }
-    
+
     // Validate legal checkboxes
     if (!legalCheckboxes.termsAccepted || !legalCheckboxes.privacyAccepted || !legalCheckboxes.legalAccepted) {
       setError("You must accept all terms and conditions to continue");
@@ -158,103 +159,399 @@ export default function RegisterPage() {
     }
   };
 
+  const isFormEnabled = verificationState.step === "verified";
+
   return (
     <div className="flex min-h-screen items-center justify-center p-4" suppressHydrationWarning>
-      <Card className="w-full max-w-xl border-slate-200 shadow-sm">
+      <Card className="w-full max-w-2xl border-slate-200 shadow-sm">
         <CardHeader className="space-y-1 text-center">
           <CardTitle className="text-2xl font-semibold">Create account</CardTitle>
           <CardDescription>Register to start using the hospital system</CardDescription>
-          {step === "email" && <p className="text-xs text-muted-foreground pt-2">Step 1: Verify your email</p>}
-          {step === "verification" && <p className="text-xs text-muted-foreground pt-2">Step 2: Enter verification code</p>}
-          {step === "form" && <p className="text-xs text-muted-foreground pt-2">Step 3: Complete your profile</p>}
         </CardHeader>
 
-        {/* Step 1: Email Verification */}
-        {step === "email" && (
-          <form onSubmit={handleSendVerification}>
-            <CardContent className="grid gap-4">
-              {error && <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
-              <div className="space-y-2">
-                <Label htmlFor="verify-email">Email Address *</Label>
-                <Input
-                  id="verify-email"
-                  type="email"
-                  required
-                  value={emailForVerification}
-                  onChange={(e) => setEmailForVerification(e.target.value)}
-                  placeholder="john@example.com"
-                />
-                <p className="text-xs text-muted-foreground">We'll send a verification code to this email</p>
-              </div>
-            </CardContent>
-            <CardFooter className="flex flex-col gap-3">
-              <Button className="w-full" type="submit" disabled={loading}>
-                {loading ? "Sending code..." : "Send Verification Code"}
-              </Button>
-              <p className="text-center text-sm text-muted-foreground">
-                Already have an account? <Link href="/login" className="text-slate-900 underline">Sign in</Link>
-              </p>
-            </CardFooter>
-          </form>
-        )}
+        <form onSubmit={handleSubmit}>
+          <CardContent className="grid gap-4 sm:grid-cols-2 max-h-[75vh] overflow-y-auto">
+            {error && <div className="sm:col-span-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
-        {/* Step 2: Verify Code */}
-        {step === "verification" && (
-          <form onSubmit={handleVerifyEmail}>
-            <CardContent className="grid gap-4">
-              {error && <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
-              {!error && verificationSent && (
-                <div className="rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-600 flex items-center gap-2">
-                  <Mail size={16} />
-                  Verification code sent to {emailForVerification}
+            {/* Email Verification Section */}
+            <div className="sm:col-span-2 space-y-3 border-b border-slate-200 pb-4">
+              <Label className="text-base font-semibold">Email Verification *</Label>
+
+              {verificationState.step === "initial" && (
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email Address *</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      required
+                      value={formData.email}
+                      onChange={handleChange}
+                      placeholder="your@email.com"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="role">Register as *</Label>
+                    <select
+                      id="role"
+                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+                      value={formData.role}
+                      onChange={handleChange}
+                    >
+                      <option value="PATIENT">Patient</option>
+                      <option value="DOCTOR">Doctor</option>
+                      <option value="STAFF">Staff</option>
+                      <option value="HOSPITAL">Hospital</option>
+                    </select>
+                  </div>
+                  <Button
+                    type="button"
+                    className="w-full"
+                    onClick={handleSendVerificationCode}
+                    disabled={verificationState.loading || !formData.email || !formData.role}
+                  >
+                    {verificationState.loading ? (
+                      <>
+                        <Loader size={16} className="mr-2 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      "Send Verification Code"
+                    )}
+                  </Button>
                 </div>
               )}
-              <div className="space-y-2">
-                <Label htmlFor="verify-code">Verification Code *</Label>
-                <Input
-                  id="verify-code"
-                  type="text"
-                  required
-                  value={verificationCode}
-                  onChange={(e) => setVerificationCode(e.target.value.toUpperCase())}
-                  placeholder="e.g., ABC123"
-                  maxLength={6}
-                />
-                <p className="text-xs text-muted-foreground">Enter the 6-character code from your email</p>
-              </div>
-            </CardContent>
-            <CardFooter className="flex flex-col gap-3">
-              <Button className="w-full" type="submit" disabled={loading}>
-                {loading ? "Verifying..." : "Verify Email"}
-              </Button>
-              <Button
-                variant="outline"
-                className="w-full"
-                type="button"
-                onClick={() => {
-                  setStep("email");
-                  setError("");
-                  setVerificationCode("");
-                  setVerificationSent(false);
-                }}
-              >
-                Use different email
-              </Button>
-            </CardFooter>
-          </form>
-        )}
 
-        {/* Step 3: Full Registration Form */}
-        {step === "form" && (
-          <form onSubmit={handleSubmit}>
-            <CardContent className="grid gap-4 sm:grid-cols-2 max-h-[70vh] overflow-y-auto">
-            {error && <div className="sm:col-span-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
-            
-            {/* Email Verified Badge */}
-            <div className="sm:col-span-2 rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-600 flex items-center gap-2">
-              <CheckCircle size={16} />
-              <span>Email verified: {emailForVerification}</span>
+              {verificationState.step === "code-sent" && (
+                <div className="space-y-3">
+                  <div className="rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-600 flex items-center gap-2">
+                    <Mail size={16} />
+                    Verification code sent to {formData.email}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="verify-code">Verification Code *</Label>
+                    <Input
+                      id="verify-code"
+                      type="text"
+                      required
+                      value={verificationState.code}
+                      onChange={(e) =>
+                        setVerificationState({
+                          ...verificationState,
+                          code: e.target.value.toUpperCase(),
+                        })
+                      }
+                      placeholder="e.g., ABC123"
+                      maxLength={6}
+                    />
+                    <p className="text-xs text-muted-foreground">6-character code from your email</p>
+                  </div>
+                  <Button
+                    type="button"
+                    className="w-full"
+                    onClick={handleVerifyCode}
+                    disabled={verificationState.loading || verificationState.code.length < 6}
+                  >
+                    {verificationState.loading ? (
+                      <>
+                        <Loader size={16} className="mr-2 animate-spin" />
+                        Verifying...
+                      </>
+                    ) : (
+                      "Verify Email"
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => {
+                      setVerificationState({ step: "initial", code: "", loading: false });
+                      setError("");
+                    }}
+                  >
+                    Change email
+                  </Button>
+                </div>
+              )}
+
+              {verificationState.step === "verified" && (
+                <div className="rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-600 flex items-center gap-2">
+                  <CheckCircle size={16} />
+                  <span>✓ Email verified: {formData.email}</span>
+                </div>
+              )}
             </div>
+
+            {/* Registration Form - Only visible after email verification */}
+            {isFormEnabled && (
+              <>
+                {/* Basic Info */}
+                <div className="space-y-2">
+                  <Label htmlFor="firstName">First name *</Label>
+                  <Input
+                    id="firstName"
+                    required
+                    value={formData.firstName}
+                    onChange={handleChange}
+                    placeholder="John"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Last name *</Label>
+                  <Input
+                    id="lastName"
+                    required
+                    value={formData.lastName}
+                    onChange={handleChange}
+                    placeholder="Doe"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password *</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    required
+                    value={formData.password}
+                    onChange={handleChange}
+                    placeholder="••••••••"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    At least 8 characters, 1 uppercase letter, and 1 number
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword">Confirm Password *</Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    required
+                    value={(formData as any).confirmPassword}
+                    onChange={handleChange}
+                    placeholder="••••••••"
+                  />
+                </div>
+
+                {/* Contact Info */}
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    placeholder="+91 9876543210"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="emergencyContact">Emergency Contact</Label>
+                  <Input
+                    id="emergencyContact"
+                    value={formData.emergencyContact}
+                    onChange={handleChange}
+                    placeholder="Contact number"
+                  />
+                </div>
+
+                {/* Personal Info */}
+                <div className="space-y-2">
+                  <Label htmlFor="gender">Gender</Label>
+                  <select
+                    id="gender"
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+                    value={formData.gender}
+                    onChange={handleChange}
+                  >
+                    <option value="">Select gender</option>
+                    <option value="MALE">Male</option>
+                    <option value="FEMALE">Female</option>
+                    <option value="OTHER">Other</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="dateOfBirth">Date of Birth</Label>
+                  <Input
+                    id="dateOfBirth"
+                    type="date"
+                    value={formData.dateOfBirth}
+                    onChange={handleChange}
+                  />
+                </div>
+
+                {/* Address */}
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="address">Address</Label>
+                  <Input
+                    id="address"
+                    value={formData.address}
+                    onChange={handleChange}
+                    placeholder="123 Main Street"
+                  />
+                </div>
+
+                {/* Medical Info */}
+                <div className="space-y-2">
+                  <Label htmlFor="bloodGroup">Blood Group</Label>
+                  <select
+                    id="bloodGroup"
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+                    value={formData.bloodGroup}
+                    onChange={handleChange}
+                  >
+                    <option value="">Select blood group</option>
+                    <option value="O+">O+</option>
+                    <option value="O-">O-</option>
+                    <option value="A+">A+</option>
+                    <option value="A-">A-</option>
+                    <option value="B+">B+</option>
+                    <option value="B-">B-</option>
+                    <option value="AB+">AB+</option>
+                    <option value="AB-">AB-</option>
+                  </select>
+                </div>
+
+                {/* Physical Measurements */}
+                <div className="space-y-2">
+                  <Label htmlFor="height">Height (cm)</Label>
+                  <Input
+                    id="height"
+                    type="number"
+                    step="0.1"
+                    value={formData.height}
+                    onChange={handleChange}
+                    placeholder="170"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="weight">Weight (kg)</Label>
+                  <Input
+                    id="weight"
+                    type="number"
+                    step="0.1"
+                    value={formData.weight}
+                    onChange={handleChange}
+                    placeholder="70"
+                  />
+                </div>
+
+                {/* Legal Checkboxes */}
+                <div className="sm:col-span-2 space-y-3 pt-4 border-t border-border/40">
+                  <Label className="text-base font-semibold">Legal Requirements *</Label>
+
+                  <div className="flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      id="terms"
+                      checked={legalCheckboxes.termsAccepted}
+                      onChange={() => handleCheckboxChange("termsAccepted")}
+                      className="mt-1 w-4 h-4 rounded border-border"
+                    />
+                    <label htmlFor="terms" className="text-sm text-foreground flex items-center gap-2 cursor-pointer">
+                      I accept the{" "}
+                      <button
+                        type="button"
+                        onClick={() => setModals({ ...modals, termsOpen: true })}
+                        className="text-primary hover:underline font-medium"
+                      >
+                        Terms and Conditions
+                      </button>
+                    </label>
+                  </div>
+
+                  <div className="flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      id="privacy"
+                      checked={legalCheckboxes.privacyAccepted}
+                      onChange={() => handleCheckboxChange("privacyAccepted")}
+                      className="mt-1 w-4 h-4 rounded border-border"
+                    />
+                    <label htmlFor="privacy" className="text-sm text-foreground flex items-center gap-2 cursor-pointer">
+                      I accept the{" "}
+                      <button
+                        type="button"
+                        onClick={() => setModals({ ...modals, privacyOpen: true })}
+                        className="text-primary hover:underline font-medium"
+                      >
+                        Privacy Policy
+                      </button>
+                    </label>
+                  </div>
+
+                  <div className="flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      id="legal"
+                      checked={legalCheckboxes.legalAccepted}
+                      onChange={() => handleCheckboxChange("legalAccepted")}
+                      className="mt-1 w-4 h-4 rounded border-border"
+                    />
+                    <label htmlFor="legal" className="text-sm text-foreground flex items-center gap-2 cursor-pointer">
+                      I accept the{" "}
+                      <button
+                        type="button"
+                        onClick={() => setModals({ ...modals, legalOpen: true })}
+                        className="text-primary hover:underline font-medium"
+                      >
+                        Legal Tender & Liability
+                      </button>
+                    </label>
+                  </div>
+                </div>
+              </>
+            )}
+          </CardContent>
+
+          {isFormEnabled && (
+            <CardFooter className="flex flex-col gap-3">
+              <Button
+                className="w-full"
+                type="submit"
+                disabled={
+                  loading ||
+                  !legalCheckboxes.termsAccepted ||
+                  !legalCheckboxes.privacyAccepted ||
+                  !legalCheckboxes.legalAccepted
+                }
+              >
+                {loading ? "Creating account..." : "Create account"}
+              </Button>
+              <p className="text-center text-sm text-muted-foreground">
+                Already have an account?{" "}
+                <Link href="/login" className="font-medium text-slate-900 underline hover:no-underline">
+                  Sign in
+                </Link>
+              </p>
+            </CardFooter>
+          )}
+        </form>
+      </Card>
+
+      {/* Legal Modals */}
+      <LegalModal
+        isOpen={modals.termsOpen}
+        onClose={() => setModals({ ...modals, termsOpen: false })}
+        title="Terms and Conditions"
+        content={TERMS_AND_CONDITIONS}
+      />
+      <LegalModal
+        isOpen={modals.privacyOpen}
+        onClose={() => setModals({ ...modals, privacyOpen: false })}
+        title="Privacy Policy"
+        content={PRIVACY_POLICY}
+      />
+      <LegalModal
+        isOpen={modals.legalOpen}
+        onClose={() => setModals({ ...modals, legalOpen: false })}
+        title="Legal Tender & Liability"
+        content={LEGAL_TENDER}
+      />
+    </div>
+  );
+}
+
             
             {/* Basic Info */}
             <div className="space-y-2">

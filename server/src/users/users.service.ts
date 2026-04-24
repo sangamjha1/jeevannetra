@@ -22,6 +22,13 @@ export class UsersService {
     });
   }
 
+  async findByEmailAndRole(email: string, role: string): Promise<User | null> {
+    return this.userRepository.findOne({
+      where: { email, role },
+      relations: ['patientProfile', 'doctorProfile', 'hospitalProfile', 'staffProfile'],
+    });
+  }
+
   async findById(id: string): Promise<User | null> {
     return this.userRepository.findOne({
       where: { id },

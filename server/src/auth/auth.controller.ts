@@ -50,12 +50,12 @@ export class AuthController {
   }
 
   @Post('send-verification-email')
-  async sendVerificationEmail(@Body() body: { email: string }) {
-    return this.authService.sendVerificationEmail(body.email);
+  async sendVerificationEmail(@Body() body: { email: string; role?: string }) {
+    return this.authService.sendVerificationEmail(body.email, body.role);
   }
 
   @Post('verify-email-code')
-  async verifyEmailCode(@Body() body: { email: string; code: string }) {
-    return this.authService.verifyEmailCode(body.email, body.code);
+  async verifyEmailCode(@Body() body: { email: string; code: string; role?: string }) {
+    return this.authService.verifyEmailCode(body.email, body.code, body.role);
   }
 }

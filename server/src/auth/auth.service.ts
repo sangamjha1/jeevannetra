@@ -37,52 +37,16 @@ export class AuthService {
   }
 
   async signup(data: any): Promise<User> {
-    const existingUser = await this.usersService.findByEmail(data.email);
+    // Check if email+role combo exists
+    const userRole = data.role || Role.PATIENT;
+    const existingUser = await this.usersService.findByEmailAndRole(data.email, userRole);
     
-    // Check if user exists but email is not verified
     if (existingUser && !existingUser.isEmailVerified) {
       throw new UnauthorizedException('Email has not been verified yet. Please verify your email first.');
     }
 
-    // If user exists and email is verified, update their details
     if (existingUser && existingUser.isEmailVerified) {
-      const hashedPassword = await bcrypt.hash(data.password, 10);
-      
-      const dateOfBirth = data.dateOfBirth ? new Date(data.dateOfBirth) : undefined;
-      
-      const updatedUser = await this.usersService.update(existingUser.id, {
-        password: hashedPassword,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        phone: data.phone || null,
-        role: data.role || 'PATIENT',
-        address: data.address || null,
-        gender: data.gender || null,
-        dateOfBirth: dateOfBirth,
-      } as any);
-
-      // Create patient profile if registering as patient with medical data
-      if ((data.role || 'PATIENT') === 'PATIENT') {
-        const existingProfile = await this.patientRepository.findOne({ where: { userId: existingUser.id } });
-        if (!existingProfile) {
-          const patientData = {
-            userId: existingUser.id,
-            bloodGroup: data.bloodGroup || null,
-            height: data.height ? parseFloat(data.height) : null,
-            weight: data.weight ? parseFloat(data.weight) : null,
-            emergencyContact: data.emergencyContact || null,
-          } as any;
-          await this.patientRepository.save(this.patientRepository.create(patientData));
-        }
-      }
-
-      this.logger.log(`✅ User account completed for verified email: ${data.email}`);
-      return updatedUser;
-    }
-
-    // New user registration (email not in system yet)
-    if (existingUser) {
-      throw new ConflictException('User already exists');
+      throw new ConflictException(`This email is already registered as a ${userRole.toLowerCase()}`);
     }
 
     const hashedPassword = await bcrypt.hash(data.password, 10);
@@ -96,15 +60,15 @@ export class AuthService {
       firstName: data.firstName,
       lastName: data.lastName,
       phone: data.phone || null,
-      role: data.role,
+      role: userRole,
       address: data.address || null,
       gender: data.gender || null,
       dateOfBirth: dateOfBirth,
-      isEmailVerified: false, // Mark as not verified if email not verified through verification flow
+      isEmailVerified: true, // Mark as verified if coming from verification flow
     });
 
     // Create patient profile if registering as patient with medical data
-    if (user.role === Role.PATIENT) {
+    if (userRole === Role.PATIENT) {
       const existingProfile = await this.patientRepository.findOne({ where: { userId: user.id } });
       if (!existingProfile) {
         const patientData = {
@@ -118,6 +82,7 @@ export class AuthService {
       }
     }
 
+    this.logger.log(`✅ User registered successfully: ${data.email} as ${userRole}`);
     return user;
   }
 
@@ -307,23 +272,24 @@ export class AuthService {
     return { success: true, message: 'Password has been reset successfully. You can now login with your new password.' };
   }
 
-  async sendVerificationEmail(email: string) {
-    this.logger.log(`🔍 Checking if email already verified: ${email}`);
+  async sendVerificationEmail(email: string, role?: string) {
+    const userRole = role || Role.PATIENT;
+    this.logger.log(`🔍 Checking if email already verified: ${email} for role ${userRole}`);
     
-    // Check if user already exists
-    let user = await this.usersService.findByEmail(email);
+    // Check if email+role combo already exists
+    let user = await this.usersService.findByEmailAndRole(email, userRole);
     
     if (user && user.isEmailVerified) {
-      throw new ConflictException('Email already registered and verified');
+      throw new ConflictException(`This email is already registered as a ${userRole.toLowerCase()}`);
     }
 
     // If user doesn't exist, create a minimal unverified user record
     if (!user) {
-      this.logger.log(`📝 Creating temporary user record for verification: ${email}`);
+      this.logger.log(`📝 Creating temporary user record for verification: ${email} (${userRole})`);
       user = await this.usersService.create({
         email: email,
         password: 'temp', // Temporary password, will be set during signup
-        role: Role.PATIENT, // Default role
+        role: userRole as Role,
         isEmailVerified: false,
       });
     }
@@ -398,10 +364,11 @@ export class AuthService {
     return { success: true, message: 'Verification code sent to your email.' };
   }
 
-  async verifyEmailCode(email: string, code: string) {
-    this.logger.log(`🔍 Verifying email code for: ${email}`);
+  async verifyEmailCode(email: string, code: string, role?: string) {
+    const userRole = role || Role.PATIENT;
+    this.logger.log(`🔍 Verifying email code for: ${email} (${userRole})`);
     
-    const user = await this.usersService.findByEmail(email);
+    const user = await this.usersService.findByEmailAndRole(email, userRole);
     if (!user) {
       this.logger.warn(`⚠️ Verification attempted for non-existent user: ${email}`);
       throw new UnauthorizedException('Email not found. Please register first.');
@@ -425,7 +392,7 @@ export class AuthService {
       emailVerificationCodeExpiry: null,
     } as any);
 
-    this.logger.log(`✅ Email verified successfully for ${email}`);
+    this.logger.log(`✅ Email verified successfully for ${email} (${userRole})`);
 
     return { success: true, message: 'Email verified successfully. You can now complete your registration.' };
   }
