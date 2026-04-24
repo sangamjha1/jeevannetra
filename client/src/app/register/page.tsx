@@ -551,26 +551,3 @@ export default function RegisterPage() {
     </div>
   );
 }
-
-      {/* Legal Modals */}
-      <LegalModal
-        isOpen={modals.termsOpen}
-        onClose={() => setModals({ ...modals, termsOpen: false })}
-        title="Terms and Conditions"
-        content={TERMS_AND_CONDITIONS}
-      />
-      <LegalModal
-        isOpen={modals.privacyOpen}
-        onClose={() => setModals({ ...modals, privacyOpen: false })}
-        title="Privacy Policy"
-        content={PRIVACY_POLICY}
-      />
-      <LegalModal
-        isOpen={modals.legalOpen}
-        onClose={() => setModals({ ...modals, legalOpen: false })}
-        title="Legal Tender & Liability"
-        content={LEGAL_TENDER}
-      />
-    </div>
-  );
-}
