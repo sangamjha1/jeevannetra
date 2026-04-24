@@ -38,9 +38,53 @@ export class AuthService {
 
   async signup(data: any): Promise<User> {
     const existingUser = await this.usersService.findByEmail(data.email);
+    
+    // Check if user exists but email is not verified
+    if (existingUser && !existingUser.isEmailVerified) {
+      throw new UnauthorizedException('Email has not been verified yet. Please verify your email first.');
+    }
+
+    // If user exists and email is verified, update their details
+    if (existingUser && existingUser.isEmailVerified) {
+      const hashedPassword = await bcrypt.hash(data.password, 10);
+      
+      const dateOfBirth = data.dateOfBirth ? new Date(data.dateOfBirth) : undefined;
+      
+      const updatedUser = await this.usersService.update(existingUser.id, {
+        password: hashedPassword,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phone: data.phone || null,
+        role: data.role || 'PATIENT',
+        address: data.address || null,
+        gender: data.gender || null,
+        dateOfBirth: dateOfBirth,
+      } as any);
+
+      // Create patient profile if registering as patient with medical data
+      if ((data.role || 'PATIENT') === 'PATIENT') {
+        const existingProfile = await this.patientRepository.findOne({ where: { userId: existingUser.id } });
+        if (!existingProfile) {
+          const patientData = {
+            userId: existingUser.id,
+            bloodGroup: data.bloodGroup || null,
+            height: data.height ? parseFloat(data.height) : null,
+            weight: data.weight ? parseFloat(data.weight) : null,
+            emergencyContact: data.emergencyContact || null,
+          } as any;
+          await this.patientRepository.save(this.patientRepository.create(patientData));
+        }
+      }
+
+      this.logger.log(`✅ User account completed for verified email: ${data.email}`);
+      return updatedUser;
+    }
+
+    // New user registration (email not in system yet)
     if (existingUser) {
       throw new ConflictException('User already exists');
     }
+
     const hashedPassword = await bcrypt.hash(data.password, 10);
     
     // Parse date if provided
@@ -56,6 +100,7 @@ export class AuthService {
       address: data.address || null,
       gender: data.gender || null,
       dateOfBirth: dateOfBirth,
+      isEmailVerified: false, // Mark as not verified if email not verified through verification flow
     });
 
     // Create patient profile if registering as patient with medical data
@@ -260,5 +305,128 @@ export class AuthService {
     this.logger.log(`✅ Password reset successful for ${email}`);
 
     return { success: true, message: 'Password has been reset successfully. You can now login with your new password.' };
+  }
+
+  async sendVerificationEmail(email: string) {
+    this.logger.log(`🔍 Checking if email already verified: ${email}`);
+    
+    // Check if user already exists
+    let user = await this.usersService.findByEmail(email);
+    
+    if (user && user.isEmailVerified) {
+      throw new ConflictException('Email already registered and verified');
+    }
+
+    // If user doesn't exist, create a minimal unverified user record
+    if (!user) {
+      this.logger.log(`📝 Creating temporary user record for verification: ${email}`);
+      user = await this.usersService.create({
+        email: email,
+        password: 'temp', // Temporary password, will be set during signup
+        role: Role.PATIENT, // Default role
+        isEmailVerified: false,
+      });
+    }
+
+    this.logger.log(`✅ Sending verification code to: ${email}`);
+
+    // Generate random 6-character verification code
+    const verificationCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    
+    // Set expiry to 15 minutes from now
+    const expiryTime = new Date(Date.now() + 15 * 60 * 1000);
+
+    // Update verification code
+    await this.usersService.update(user.id, {
+      emailVerificationCode: verificationCode,
+      emailVerificationCodeExpiry: expiryTime,
+    } as any);
+    this.logger.log(`💾 Verification code saved for: ${email}`);
+
+    // Send email via SMTP
+    try {
+      if (this.transporter && process.env.SMTP_FROM_EMAIL) {
+        this.logger.log(`📧 Attempting to send verification email to: ${email}`);
+        const result = await this.transporter.sendMail({
+          from: `JeevanNetra HMS <${process.env.SMTP_FROM_EMAIL}>`,
+          to: email,
+          subject: 'Email Verification Code - JeevanNetra HMS',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <div style="text-align: center; margin-bottom: 30px;">
+                <h1 style="color: #333; margin: 0;">JeevanNetra HMS</h1>
+                <p style="color: #666; margin: 5px 0 0 0;">Healthcare Management System</p>
+              </div>
+              
+              <div style="background: #f9f9f9; border-left: 4px solid #28a745; padding: 20px; margin: 20px 0;">
+                <h2 style="color: #333; margin-top: 0;">Email Verification</h2>
+                <p>Welcome to JeevanNetra HMS!</p>
+                <p>To complete your registration, please verify your email address using the code below:</p>
+                
+                <div style="background: #28a745; color: white; padding: 20px; text-align: center; border-radius: 8px; margin: 25px 0;">
+                  <p style="margin: 0; font-size: 12px; opacity: 0.9;">Your Verification Code</p>
+                  <h1 style="margin: 10px 0 0 0; font-size: 42px; letter-spacing: 3px;">${verificationCode}</h1>
+                </div>
+                
+                <p style="color: #666; font-size: 14px;">This code will expire in <strong>15 minutes</strong>.</p>
+                <p style="color: #666; font-size: 14px; margin-top: 20px;">Do not share this code with anyone. JeevanNetra staff will never ask for this code.</p>
+              </div>
+              
+              <div style="border-top: 1px solid #eee; padding-top: 20px; margin-top: 30px;">
+                <p style="color: #999; font-size: 12px; margin: 0;">
+                  © 2026 JeevanNetra HMS. All rights reserved.<br>
+                  This is an automated message. Please do not reply to this email.
+                </p>
+              </div>
+            </div>
+          `,
+        });
+        this.logger.log(`✅ Verification email sent successfully to ${email}. Message ID: ${result.messageId}`);
+      } else {
+        this.logger.warn(`⚠️  Email NOT sent - transporter: ${!!this.transporter}, fromEmail: ${process.env.SMTP_FROM_EMAIL}`);
+        this.logger.log(`\n⚠️  FALLBACK: Verification code for ${email}:`);
+        this.logger.log(`   Code: ${verificationCode}`);
+        this.logger.log(`   Expires in: 15 minutes\n`);
+      }
+    } catch (error) {
+      this.logger.error(`❌ Failed to send verification email to ${email}:`, error);
+      this.logger.log(`\n⚠️  FALLBACK: Verification code for ${email}:`);
+      this.logger.log(`   Code: ${verificationCode}`);
+      this.logger.log(`   Expires in: 15 minutes\n`);
+    }
+
+    return { success: true, message: 'Verification code sent to your email.' };
+  }
+
+  async verifyEmailCode(email: string, code: string) {
+    this.logger.log(`🔍 Verifying email code for: ${email}`);
+    
+    const user = await this.usersService.findByEmail(email);
+    if (!user) {
+      this.logger.warn(`⚠️ Verification attempted for non-existent user: ${email}`);
+      throw new UnauthorizedException('Email not found. Please register first.');
+    }
+
+    // Check if code matches and hasn't expired
+    if (!user.emailVerificationCode || user.emailVerificationCode !== code.toUpperCase()) {
+      this.logger.warn(`⚠️ Invalid verification code for ${email}`);
+      throw new UnauthorizedException('Invalid verification code');
+    }
+
+    if (!user.emailVerificationCodeExpiry || new Date() > user.emailVerificationCodeExpiry) {
+      this.logger.warn(`⚠️ Verification code expired for ${email}`);
+      throw new UnauthorizedException('Verification code has expired. Request a new one.');
+    }
+
+    // Mark email as verified and clear verification code
+    await this.usersService.update(user.id, {
+      isEmailVerified: true,
+      emailVerificationCode: null,
+      emailVerificationCodeExpiry: null,
+    } as any);
+
+    this.logger.log(`✅ Email verified successfully for ${email}`);
+
+    return { success: true, message: 'Email verified successfully. You can now complete your registration.' };
   }
 }

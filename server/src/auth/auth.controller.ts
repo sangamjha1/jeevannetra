@@ -48,4 +48,14 @@ export class AuthController {
   async resetPassword(@Body() body: { email: string; code: string; newPassword: string }) {
     return this.authService.resetPassword(body.email, body.code, body.newPassword);
   }
+
+  @Post('send-verification-email')
+  async sendVerificationEmail(@Body() body: { email: string }) {
+    return this.authService.sendVerificationEmail(body.email);
+  }
+
+  @Post('verify-email-code')
+  async verifyEmailCode(@Body() body: { email: string; code: string }) {
+    return this.authService.verifyEmailCode(body.email, body.code);
+  }
 }

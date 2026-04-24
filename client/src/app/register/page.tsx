@@ -10,8 +10,16 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LegalModal } from "@/components/legal/LegalModal";
 import { TERMS_AND_CONDITIONS, PRIVACY_POLICY, LEGAL_TENDER } from "@/lib/legal-content";
+import { Mail, CheckCircle } from "lucide-react";
 
 export default function RegisterPage() {
+  // Email Verification Step
+  const [step, setStep] = useState<"email" | "verification" | "form">("email");
+  const [emailForVerification, setEmailForVerification] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
+  const [verificationSent, setVerificationSent] = useState(false);
+  
+  // Form Data
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -28,11 +36,13 @@ export default function RegisterPage() {
     weight: "",
     emergencyContact: "",
   });
+  
   const [legalCheckboxes, setLegalCheckboxes] = useState({
     termsAccepted: false,
     privacyAccepted: false,
     legalAccepted: false,
   });
+  
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [modals, setModals] = useState({
@@ -40,7 +50,58 @@ export default function RegisterPage() {
     privacyOpen: false,
     legalOpen: false,
   });
+  
   const router = useRouter();
+
+  // Step 1: Send verification email
+  const handleSendVerification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    
+    if (!emailRegex.test(emailForVerification)) {
+      setError("Invalid email format");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      await api.post("/auth/send-verification-email", { email: emailForVerification });
+      setVerificationSent(true);
+      setStep("verification");
+      setFormData({ ...formData, email: emailForVerification });
+    } catch (err: any) {
+      setError(err.response?.data?.message || "Failed to send verification email");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Step 2: Verify email code
+  const handleVerifyEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (verificationCode.length < 6) {
+      setError("Verification code must be 6 characters");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      await api.post("/auth/verify-email-code", {
+        email: emailForVerification,
+        code: verificationCode,
+      });
+      setStep("form");
+    } catch (err: any) {
+      setError(err.response?.data?.message || "Invalid or expired verification code");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.id]: e.target.value });
@@ -50,6 +111,7 @@ export default function RegisterPage() {
     setLegalCheckboxes({ ...legalCheckboxes, [key]: !legalCheckboxes[key] });
   };
 
+  // Step 3: Complete registration
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -88,7 +150,7 @@ export default function RegisterPage() {
       const signupData = { ...formData };
       delete (signupData as any).confirmPassword;
       await api.post("/auth/signup", signupData);
-      router.push("/login?registered=true");
+      router.push("/login?registered=true&verified=true");
     } catch (err: any) {
       setError(err.response?.data?.message || "Registration failed");
     } finally {
@@ -102,10 +164,97 @@ export default function RegisterPage() {
         <CardHeader className="space-y-1 text-center">
           <CardTitle className="text-2xl font-semibold">Create account</CardTitle>
           <CardDescription>Register to start using the hospital system</CardDescription>
+          {step === "email" && <p className="text-xs text-muted-foreground pt-2">Step 1: Verify your email</p>}
+          {step === "verification" && <p className="text-xs text-muted-foreground pt-2">Step 2: Enter verification code</p>}
+          {step === "form" && <p className="text-xs text-muted-foreground pt-2">Step 3: Complete your profile</p>}
         </CardHeader>
-        <form onSubmit={handleSubmit}>
-          <CardContent className="grid gap-4 sm:grid-cols-2 max-h-[70vh] overflow-y-auto">
+
+        {/* Step 1: Email Verification */}
+        {step === "email" && (
+          <form onSubmit={handleSendVerification}>
+            <CardContent className="grid gap-4">
+              {error && <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+              <div className="space-y-2">
+                <Label htmlFor="verify-email">Email Address *</Label>
+                <Input
+                  id="verify-email"
+                  type="email"
+                  required
+                  value={emailForVerification}
+                  onChange={(e) => setEmailForVerification(e.target.value)}
+                  placeholder="john@example.com"
+                />
+                <p className="text-xs text-muted-foreground">We'll send a verification code to this email</p>
+              </div>
+            </CardContent>
+            <CardFooter className="flex flex-col gap-3">
+              <Button className="w-full" type="submit" disabled={loading}>
+                {loading ? "Sending code..." : "Send Verification Code"}
+              </Button>
+              <p className="text-center text-sm text-muted-foreground">
+                Already have an account? <Link href="/login" className="text-slate-900 underline">Sign in</Link>
+              </p>
+            </CardFooter>
+          </form>
+        )}
+
+        {/* Step 2: Verify Code */}
+        {step === "verification" && (
+          <form onSubmit={handleVerifyEmail}>
+            <CardContent className="grid gap-4">
+              {error && <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+              {!error && verificationSent && (
+                <div className="rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-600 flex items-center gap-2">
+                  <Mail size={16} />
+                  Verification code sent to {emailForVerification}
+                </div>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="verify-code">Verification Code *</Label>
+                <Input
+                  id="verify-code"
+                  type="text"
+                  required
+                  value={verificationCode}
+                  onChange={(e) => setVerificationCode(e.target.value.toUpperCase())}
+                  placeholder="e.g., ABC123"
+                  maxLength={6}
+                />
+                <p className="text-xs text-muted-foreground">Enter the 6-character code from your email</p>
+              </div>
+            </CardContent>
+            <CardFooter className="flex flex-col gap-3">
+              <Button className="w-full" type="submit" disabled={loading}>
+                {loading ? "Verifying..." : "Verify Email"}
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full"
+                type="button"
+                onClick={() => {
+                  setStep("email");
+                  setError("");
+                  setVerificationCode("");
+                  setVerificationSent(false);
+                }}
+              >
+                Use different email
+              </Button>
+            </CardFooter>
+          </form>
+        )}
+
+        {/* Step 3: Full Registration Form */}
+        {step === "form" && (
+          <form onSubmit={handleSubmit}>
+            <CardContent className="grid gap-4 sm:grid-cols-2 max-h-[70vh] overflow-y-auto">
             {error && <div className="sm:col-span-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+            
+            {/* Email Verified Badge */}
+            <div className="sm:col-span-2 rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-600 flex items-center gap-2">
+              <CheckCircle size={16} />
+              <span>Email verified: {emailForVerification}</span>
+            </div>
             
             {/* Basic Info */}
             <div className="space-y-2">
@@ -280,11 +429,26 @@ export default function RegisterPage() {
             <Button className="w-full" type="submit" disabled={loading || !legalCheckboxes.termsAccepted || !legalCheckboxes.privacyAccepted || !legalCheckboxes.legalAccepted}>
               {loading ? "Creating account..." : "Create account"}
             </Button>
+            <Button
+              variant="outline"
+              className="w-full"
+              type="button"
+              onClick={() => {
+                setStep("email");
+                setError("");
+                setEmailForVerification("");
+                setVerificationCode("");
+                setVerificationSent(false);
+              }}
+            >
+              Change email
+            </Button>
             <p className="text-center text-sm text-muted-foreground">
               Already have an account? <Link href="/login" className="text-slate-900 underline">Sign in</Link>
             </p>
           </CardFooter>
         </form>
+        )}
       </Card>
 
       {/* Legal Modals */}
