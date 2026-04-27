@@ -11,32 +11,39 @@ export class PatientsService {
     private patientRepository: Repository<Patient>,
   ) {}
 
-  async findOne(userId: string) {
+  async findOne(userId: string, includeRelations: boolean = false) {
+    const query = this.patientRepository.createQueryBuilder('patient')
+      .where('patient.userId = :userId', { userId });
+
+    if (includeRelations) {
+      query
+        .leftJoinAndSelect('patient.user', 'user')
+        .leftJoinAndSelect('patient.appointments', 'appointments')
+        .leftJoinAndSelect('appointments.doctor', 'doctor')
+        .leftJoinAndSelect('doctor.user', 'doctorUser')
+        .leftJoinAndSelect('patient.prescriptions', 'prescriptions')
+        .leftJoinAndSelect('patient.medicalHistory', 'medicalHistory')
+        .leftJoinAndSelect('patient.bills', 'bills')
+        .orderBy('appointments.date', 'DESC');
+    }
+
+    const patient = await query.getOne();
+    if (!patient) throw new NotFoundException('Patient profile not found');
+    return patient;
+  }
+
+  async findOneBasic(userId: string) {
     const patient = await this.patientRepository.findOne({
       where: { userId },
-      relations: [
-        'user',
-        'appointments',
-        'appointments.doctor',
-        'appointments.doctor.user',
-        'prescriptions',
-        'medicalHistory',
-        'bills',
-      ],
-      order: {
-        appointments: {
-          date: 'DESC'
-        }
-      }
+      relations: ['user'],
     });
-
     if (!patient) throw new NotFoundException('Patient profile not found');
     return patient;
   }
 
   async update(userId: string, updatePatientDto: UpdatePatientDto) {
     await this.patientRepository.update({ userId }, updatePatientDto);
-    return this.findOne(userId);
+    return this.findOneBasic(userId);
   }
 
   async create(userId: string, createPatientDto: CreatePatientDto) {

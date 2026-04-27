@@ -21,7 +21,7 @@ export class PatientsController {
   @Get('profile')
   @Roles(Role.PATIENT)
   async getProfile(@Request() req: AuthenticatedRequest) {
-    return this.patientsService.findOne(req.user.userId);
+    return this.patientsService.findOneBasic(req.user.userId);
   }
 
   @Post('profile')

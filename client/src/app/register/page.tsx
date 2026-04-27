@@ -7,6 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MessageAlert } from "@/components/ui/message-alert";
+import { FormError } from "@/components/ui/form-error";
+import { FieldError } from "@/components/ui/field-error";
+import { PasswordValidator } from "@/components/ui/password-validator";
 import Link from "next/link";
 import { LegalModal } from "@/components/legal/LegalModal";
 import { TERMS_AND_CONDITIONS, PRIVACY_POLICY, LEGAL_TENDER } from "@/lib/legal-content";
@@ -60,6 +63,13 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [verificationLoading, setVerificationLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({
+    email: "",
+    password: "",
+    confirmPassword: "",
+    firstName: "",
+    lastName: "",
+  });
   const [modals, setModals] = useState({
     termsOpen: false,
     privacyOpen: false,
@@ -73,6 +83,96 @@ export default function RegisterPage() {
   const handleCheckboxChange = (key: keyof typeof legalCheckboxes) => {
     setLegalCheckboxes({ ...legalCheckboxes, [key]: !legalCheckboxes[key] });
   };
+
+  // Real-time password validation
+  useEffect(() => {
+    if (!formData.password) {
+      setFieldErrors((prev) => ({ ...prev, password: "" }));
+      return;
+    }
+
+    const errors: string[] = [];
+    if (formData.password.length < 8) {
+      errors.push("At least 8 characters");
+    }
+    if (!/[A-Z]/.test(formData.password)) {
+      errors.push("One uppercase letter");
+    }
+    if (!/[0-9]/.test(formData.password)) {
+      errors.push("One number");
+    }
+
+    setFieldErrors((prev) => ({
+      ...prev,
+      password: errors.length > 0 ? `Missing: ${errors.join(", ")}` : "",
+    }));
+  }, [formData.password]);
+
+  // Real-time confirm password validation
+  useEffect(() => {
+    if (!formData.confirmPassword) {
+      setFieldErrors((prev) => ({ ...prev, confirmPassword: "" }));
+      return;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        confirmPassword: "Passwords do not match",
+      }));
+    } else {
+      setFieldErrors((prev) => ({
+        ...prev,
+        confirmPassword: "",
+      }));
+    }
+  }, [formData.password, formData.confirmPassword]);
+
+  // Real-time email validation
+  useEffect(() => {
+    if (!formData.email) {
+      setFieldErrors((prev) => ({ ...prev, email: "" }));
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      setFieldErrors((prev) => ({ ...prev, email: "Invalid email format" }));
+    } else {
+      setFieldErrors((prev) => ({ ...prev, email: "" }));
+    }
+  }, [formData.email]);
+
+  // Real-time first name validation
+  useEffect(() => {
+    if (!formData.firstName) {
+      setFieldErrors((prev) => ({ ...prev, firstName: "" }));
+      return;
+    }
+    if (formData.firstName.length < 2) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        firstName: "First name must be at least 2 characters",
+      }));
+    } else {
+      setFieldErrors((prev) => ({ ...prev, firstName: "" }));
+    }
+  }, [formData.firstName]);
+
+  // Real-time last name validation
+  useEffect(() => {
+    if (!formData.lastName) {
+      setFieldErrors((prev) => ({ ...prev, lastName: "" }));
+      return;
+    }
+    if (formData.lastName.length < 2) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        lastName: "Last name must be at least 2 characters",
+      }));
+    } else {
+      setFieldErrors((prev) => ({ ...prev, lastName: "" }));
+    }
+  }, [formData.lastName]);
 
   const handleSendVerificationCode = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -203,7 +303,13 @@ export default function RegisterPage() {
             {/* Card Content */}
             <form onSubmit={handleSubmit} className="flex flex-col h-full">
               <div className="space-y-4 px-8 py-6 flex-1 overflow-y-auto bg-slate-900/20">
-                {error && <MessageAlert message={error} type="error" />}
+                {error && (
+                  <FormError
+                    error={error}
+                    onDismiss={() => setError("")}
+                    autoScroll
+                  />
+                )}
 
                 {/* Select Role */}
                 <div className="space-y-2">
@@ -232,7 +338,11 @@ export default function RegisterPage() {
                       value={formData.firstName}
                       onChange={handleChange}
                       placeholder="John"
+                      className={fieldErrors.firstName ? "border-red-500" : ""}
                     />
+                    {fieldErrors.firstName && (
+                      <FieldError error={fieldErrors.firstName} />
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="lastName">Last Name *</Label>
@@ -242,7 +352,11 @@ export default function RegisterPage() {
                       value={formData.lastName}
                       onChange={handleChange}
                       placeholder="Doe"
+                      className={fieldErrors.lastName ? "border-red-500" : ""}
                     />
+                    {fieldErrors.lastName && (
+                      <FieldError error={fieldErrors.lastName} />
+                    )}
                   </div>
                 </div>
 
@@ -258,27 +372,32 @@ export default function RegisterPage() {
                       onChange={handleChange}
                       disabled={emailVerified}
                       placeholder="your@email.com"
-                      className="pr-12"
+                      className={`pr-12 ${
+                        fieldErrors.email ? "border-red-500" : ""
+                      }`}
                     />
                     {!emailVerified ? (
                       <button
                         type="button"
                         onClick={handleSendVerificationCode}
-                        disabled={verificationLoading || !formData.email}
+                        disabled={
+                          verificationLoading || !formData.email || !!fieldErrors.email
+                        }
                         className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 text-xs font-medium bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
-                        {verificationLoading ? <Loader size={16} className="animate-spin" /> : "Verify"}
+                        {verificationLoading ? (
+                          <Loader size={16} className="animate-spin" />
+                        ) : (
+                          "Verify"
+                        )}
                       </button>
                     ) : (
-                      <button
-                        type="button"
-                        disabled
-                        className="absolute right-2 top-1/2 -translate-y-1/2"
-                      >
+                      <button type="button" disabled className="absolute right-2 top-1/2 -translate-y-1/2">
                         <CheckCircle size={20} className="text-green-500" />
                       </button>
                     )}
                   </div>
+                  {fieldErrors.email && <FieldError error={fieldErrors.email} />}
                 </div>
 
                 {/* OTP Field - Appears after Verify is clicked */}
@@ -323,7 +442,9 @@ export default function RegisterPage() {
                       value={formData.password}
                       onChange={handleChange}
                       placeholder="••••••••"
-                      className="pr-10"
+                      className={`pr-10 ${
+                        fieldErrors.password ? "border-red-500" : ""
+                      }`}
                     />
                     <button
                       type="button"
@@ -331,12 +452,18 @@ export default function RegisterPage() {
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                       suppressHydrationWarning
                     >
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      {showPassword ? (
+                        <EyeOff size={18} />
+                      ) : (
+                        <Eye size={18} />
+                      )}
                     </button>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    At least 8 characters, 1 uppercase, 1 number
-                  </p>
+                  <PasswordValidator
+                    password={formData.password}
+                    confirmPassword={formData.confirmPassword}
+                    showValidation={true}
+                  />
                 </div>
 
                 {/* Confirm Password */}
@@ -350,17 +477,28 @@ export default function RegisterPage() {
                       value={(formData as any).confirmPassword}
                       onChange={handleChange}
                       placeholder="••••••••"
-                      className="pr-10"
+                      className={`pr-10 ${
+                        fieldErrors.confirmPassword ? "border-red-500" : ""
+                      }`}
                     />
                     <button
                       type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      onClick={() =>
+                        setShowConfirmPassword(!showConfirmPassword)
+                      }
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                       suppressHydrationWarning
                     >
-                      {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      {showConfirmPassword ? (
+                        <EyeOff size={18} />
+                      ) : (
+                        <Eye size={18} />
+                      )}
                     </button>
                   </div>
+                  {fieldErrors.confirmPassword && (
+                    <FieldError error={fieldErrors.confirmPassword} />
+                  )}
                 </div>
 
                 {/* Contact Info */}

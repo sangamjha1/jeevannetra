@@ -21,6 +21,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MessageAlert } from '@/components/ui/message-alert';
+import { FormError } from '@/components/ui/form-error';
+import { FieldError } from '@/components/ui/field-error';
+import { PasswordValidator } from '@/components/ui/password-validator';
 import { EmergencyContactsManager } from '@/components/profile/EmergencyContactsManager';
 import { LegalModal } from '@/components/legal/LegalModal';
 import { TERMS_AND_CONDITIONS, PRIVACY_POLICY, LEGAL_TENDER } from '@/lib/legal-content';
@@ -59,6 +62,11 @@ const ProfilePage = () => {
   const [editData, setEditData] = useState<PatientData | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [passwordData, setPasswordData] = useState({ old: '', new: '', confirm: '' });
+  const [passwordFieldErrors, setPasswordFieldErrors] = useState({
+    old: '',
+    new: '',
+    confirm: '',
+  });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -68,10 +76,57 @@ const ProfilePage = () => {
     privacyOpen: false,
     legalOpen: false,
   });
+  const [deleteAccountModal, setDeleteAccountModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Real-time new password validation
+  useEffect(() => {
+    if (!passwordData.new) {
+      setPasswordFieldErrors((prev) => ({ ...prev, new: '' }));
+      return;
+    }
+
+    const errors: string[] = [];
+    if (passwordData.new.length < 8) {
+      errors.push("At least 8 characters");
+    }
+    if (!/[A-Z]/.test(passwordData.new)) {
+      errors.push("One uppercase letter");
+    }
+    if (!/[0-9]/.test(passwordData.new)) {
+      errors.push("One number");
+    }
+
+    setPasswordFieldErrors((prev) => ({
+      ...prev,
+      new: errors.length > 0 ? `Missing: ${errors.join(", ")}` : "",
+    }));
+  }, [passwordData.new]);
+
+  // Real-time confirm password validation
+  useEffect(() => {
+    if (!passwordData.confirm) {
+      setPasswordFieldErrors((prev) => ({ ...prev, confirm: '' }));
+      return;
+    }
+
+    if (passwordData.new !== passwordData.confirm) {
+      setPasswordFieldErrors((prev) => ({
+        ...prev,
+        confirm: "Passwords do not match",
+      }));
+    } else {
+      setPasswordFieldErrors((prev) => ({
+        ...prev,
+        confirm: "",
+      }));
+    }
+  }, [passwordData.new, passwordData.confirm]);
 
   useEffect(() => {
     if (user?.role === 'PATIENT') {
@@ -139,6 +194,25 @@ const ProfilePage = () => {
     if (bmi < 25) return { label: 'Normal', color: 'text-emerald-400' };
     if (bmi < 30) return { label: 'Overweight', color: 'text-amber-400' };
     return { label: 'Obese', color: 'text-red-400' };
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText.toUpperCase() !== 'DELETE') {
+      setError('Please type "DELETE" exactly to confirm');
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await api.post('/auth/delete-account');
+      setMessage('Account deleted successfully. Redirecting...');
+      setTimeout(() => {
+        logout();
+      }, 2000);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to delete account. Please contact support.');
+      setIsDeleting(false);
+    }
   };
 
   if (isLoading || !mounted) return null;
@@ -337,15 +411,27 @@ const ProfilePage = () => {
                     <h3 className="text-lg font-semibold flex items-center gap-2"><Lock className="h-5 w-5 text-primary" /> Change Password</h3>
                     
                     <form onSubmit={handlePasswordChange} className="space-y-4">
+                      {error && (
+                        <FormError
+                          error={error}
+                          onDismiss={() => setError("")}
+                          autoScroll
+                        />
+                      )}
                       <div className="space-y-2">
                         <label className="text-sm font-medium text-muted-foreground">Current Password</label>
                         <input 
                           type="password"
                           value={passwordData.old}
                           onChange={(e) => setPasswordData({ ...passwordData, old: e.target.value })}
-                          className="w-full px-4 py-2 rounded-lg border border-border/40 bg-muted/30 text-foreground focus:ring-2 focus:ring-primary outline-none transition-all"
+                          className={`w-full px-4 py-2 rounded-lg border border-border/40 bg-muted/30 text-foreground focus:ring-2 focus:ring-primary outline-none transition-all ${
+                            passwordFieldErrors.old ? "border-red-500" : ""
+                          }`}
                           required
                         />
+                        {passwordFieldErrors.old && (
+                          <FieldError error={passwordFieldErrors.old} />
+                        )}
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm font-medium text-muted-foreground">New Password</label>
@@ -353,8 +439,15 @@ const ProfilePage = () => {
                           type="password"
                           value={passwordData.new}
                           onChange={(e) => setPasswordData({ ...passwordData, new: e.target.value })}
-                          className="w-full px-4 py-2 rounded-lg border border-border/40 bg-muted/30 text-foreground focus:ring-2 focus:ring-primary outline-none transition-all"
+                          className={`w-full px-4 py-2 rounded-lg border border-border/40 bg-muted/30 text-foreground focus:ring-2 focus:ring-primary outline-none transition-all ${
+                            passwordFieldErrors.new ? "border-red-500" : ""
+                          }`}
                           required
+                        />
+                        <PasswordValidator
+                          password={passwordData.new}
+                          confirmPassword={passwordData.confirm}
+                          showValidation={true}
                         />
                       </div>
                       <div className="space-y-2">
@@ -363,12 +456,46 @@ const ProfilePage = () => {
                           type="password"
                           value={passwordData.confirm}
                           onChange={(e) => setPasswordData({ ...passwordData, confirm: e.target.value })}
-                          className="w-full px-4 py-2 rounded-lg border border-border/40 bg-muted/30 text-foreground focus:ring-2 focus:ring-primary outline-none transition-all"
+                          className={`w-full px-4 py-2 rounded-lg border border-border/40 bg-muted/30 text-foreground focus:ring-2 focus:ring-primary outline-none transition-all ${
+                            passwordFieldErrors.confirm ? "border-red-500" : ""
+                          }`}
                           required
                         />
+                        {passwordFieldErrors.confirm && (
+                          <FieldError error={passwordFieldErrors.confirm} />
+                        )}
                       </div>
-                      <Button type="submit" className="w-full">Change Password</Button>
+                      <Button
+                        type="submit"
+                        className="w-full"
+                        disabled={
+                          Object.values(passwordFieldErrors).some((e) => e) ||
+                          !passwordData.old ||
+                          !passwordData.new ||
+                          !passwordData.confirm
+                        }
+                      >
+                        Change Password
+                      </Button>
                     </form>
+
+                    {/* Danger Zone - Delete Account */}
+                    <div className="pt-6 border-t border-border/40">
+                      <h3 className="text-lg font-semibold flex items-center gap-2 text-red-400 mb-4">
+                        <AlertTriangle className="h-5 w-5" /> Danger Zone
+                      </h3>
+                      <div className="p-4 rounded-lg border border-red-900/50 bg-red-950/40">
+                        <h4 className="font-semibold text-red-400 mb-2">Delete Account</h4>
+                        <p className="text-sm text-red-300 mb-4">Once you delete your account, there is no going back. Please be certain.</p>
+                        <Button 
+                          onClick={() => setDeleteAccountModal(true)}
+                          variant="destructive"
+                          className="w-full"
+                        >
+                          Delete Account Permanently
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -447,6 +574,61 @@ const ProfilePage = () => {
           title="Legal Tender & Liability"
           content={LEGAL_TENDER}
         />
+
+        {/* Delete Account Confirmation Modal */}
+        {deleteAccountModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <Card className="w-full max-w-md border-red-900/50 bg-slate-900/95">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-red-400">
+                  <AlertTriangle className="h-5 w-5" /> Delete Account
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="p-3 rounded-lg bg-red-950/40 border border-red-900/50">
+                  <p className="text-sm text-red-300">
+                    <strong>Warning:</strong> This action is permanent and cannot be undone. All your data, appointments, medical records, and prescriptions will be permanently deleted.
+                  </p>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Type <strong className="text-red-400">DELETE</strong> below to confirm account deletion:
+                </p>
+                <input
+                  type="text"
+                  placeholder='Type "DELETE" to confirm'
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  className="w-full px-4 py-2 rounded-lg border border-red-900/50 bg-red-950/20 text-foreground focus:ring-2 focus:ring-red-500 outline-none transition-all"
+                  disabled={isDeleting}
+                />
+                {deleteConfirmText.length > 0 && deleteConfirmText.toUpperCase() !== 'DELETE' && (
+                  <p className="text-xs text-amber-400">Please type DELETE exactly to confirm</p>
+                )}
+              </CardContent>
+              <CardContent className="border-t border-red-900/50 pt-4 flex gap-3">
+                <Button 
+                  onClick={() => {
+                    setDeleteAccountModal(false);
+                    setDeleteConfirmText('');
+                  }}
+                  variant="outline"
+                  className="flex-1"
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleDeleteAccount}
+                  variant="destructive"
+                  className="flex-1"
+                  disabled={isDeleting || deleteConfirmText.toUpperCase() !== 'DELETE'}
+                >
+                  {isDeleting ? 'Deleting...' : 'Delete Permanently'}
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        )}
     </div>
   );
 };

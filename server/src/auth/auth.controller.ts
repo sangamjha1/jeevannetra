@@ -58,4 +58,10 @@ export class AuthController {
   async verifyEmailCode(@Body() body: { email: string; code: string; role?: string }) {
     return this.authService.verifyEmailCode(body.email, body.code, body.role);
   }
+
+  @Post('delete-account')
+  @UseGuards(JwtAuthGuard)
+  async deleteAccount(@Request() req: AuthenticatedRequest) {
+    return this.authService.deleteAccount(req.user.userId);
+  }
 }

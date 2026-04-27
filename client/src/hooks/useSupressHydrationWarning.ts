@@ -7,12 +7,38 @@ import { useEffect } from 'react';
  */
 export function useSuppressHydrationWarning() {
   useEffect(() => {
-    // Store original error function
+    // Store original error and warn functions
     const originalError = console.error;
+    const originalWarn = console.warn;
+
+    // Extension patterns commonly injected by browser extensions/security software
+    const extensionPatterns = [
+      'bis_skin_checked',        // Windows Defender/Security Essentials
+      'fdprocessedid',           // Form detection extensions
+      'data-extension',          // Generic extension marker
+      'browser extension',       // Generic extension reference
+      'moz-extension',           // Firefox extensions
+      'chrome-extension',        // Chrome extensions
+      'webextension',            // Generic web extension
+      'data-chrome-extension',   // Chrome extension data
+    ];
+
+    const isExtensionRelatedError = (errorString: string): boolean => {
+      return extensionPatterns.some(pattern => errorString.includes(pattern));
+    };
+
+    const isHydrationError = (errorString: string): boolean => {
+      return (
+        errorString.includes('hydration failed') ||
+        errorString.includes('hydrated but some attributes') ||
+        errorString.includes('tree hydrated') ||
+        errorString.includes('hydration mismatch') ||
+        errorString.includes('text content does not match')
+      );
+    };
 
     // Override console.error to filter hydration warnings
     console.error = (...args: any[]) => {
-      // Check all arguments for hydration/extension patterns
       const errorString = args
         .map(arg => {
           if (typeof arg === 'string') return arg;
@@ -21,38 +47,10 @@ export function useSuppressHydrationWarning() {
         })
         .join(' ')
         .toLowerCase();
-      
-      // Suppress hydration mismatch errors that mention browser extension attributes
-      // Common attributes injected by extensions:
-      // - bis_skin_checked (Bing IS extension, Windows antivirus integration)
-      // - fdprocessedid (Form detection)
-      // - _ngcontent (Angular related)
-      // - data-extension (Generic extension marker)
-      // - _react_event (React internals can differ)
-      const extensionPatterns = [
-        'bis_skin_checked',
-        'fdprocessedid',
-        'data-extension',
-        'browser extension',
-        'moz-extension',
-        'chrome-extension',
-      ];
-
-      const isExtensionError = extensionPatterns.some(pattern => 
-        errorString.includes(pattern)
-      );
-
-      const isHydrationError = 
-        errorString.includes('hydration failed') || 
-        errorString.includes('hydrated but some attributes') ||
-        errorString.includes('tree hydrated') ||
-        errorString.includes('hydration mismatch');
 
       // Suppress if it's a hydration error from a browser extension
-      if (isHydrationError && isExtensionError) {
-        if (typeof window !== 'undefined') {
-          console.log('[Hydration] Suppressed browser extension hydration mismatch: ' + args[0]);
-        }
+      if (isHydrationError(errorString) && isExtensionRelatedError(errorString)) {
+        console.log('[Hydration] Browser extension hydration mismatch suppressed - this is not a real error');
         return;
       }
 
@@ -60,9 +58,30 @@ export function useSuppressHydrationWarning() {
       originalError.apply(console, args);
     };
 
+    // Also override console.warn for good measure
+    console.warn = (...args: any[]) => {
+      const warnString = args
+        .map(arg => {
+          if (typeof arg === 'string') return arg;
+          if (arg && typeof arg === 'object') return JSON.stringify(arg);
+          return String(arg || '');
+        })
+        .join(' ')
+        .toLowerCase();
+
+      // Suppress hydration warnings from extensions
+      if (isHydrationError(warnString) && isExtensionRelatedError(warnString)) {
+        return;
+      }
+
+      // For all other warnings, call the original console.warn
+      originalWarn.apply(console, args);
+    };
+
     return () => {
-      // Restore original console.error on cleanup
+      // Restore original functions on cleanup
       console.error = originalError;
+      console.warn = originalWarn;
     };
   }, []);
 }

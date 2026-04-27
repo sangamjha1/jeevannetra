@@ -5,6 +5,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { AccidentDetectionProvider } from "@/context/AccidentDetectionContext";
 import { HydrationSuppressor } from "@/components/providers/hydration-suppressor";
+import { HydrationErrorBoundary } from "@/components/providers/hydration-error-boundary";
 import { ThemeInitializer } from "@/components/theme-initializer";
 
 const manrope = Manrope({ subsets: ["latin"] });
@@ -22,16 +23,18 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning className="dark">
       <body className={manrope.className} suppressHydrationWarning>
-        <HydrationSuppressor>
-          <ThemeInitializer />
-          <ThemeProvider>
-            <AuthProvider>
-              <AccidentDetectionProvider>
-                {children}
-              </AccidentDetectionProvider>
-            </AuthProvider>
-          </ThemeProvider>
-        </HydrationSuppressor>
+        <HydrationErrorBoundary>
+          <HydrationSuppressor>
+            <ThemeInitializer />
+            <ThemeProvider>
+              <AuthProvider>
+                <AccidentDetectionProvider>
+                  {children}
+                </AccidentDetectionProvider>
+              </AuthProvider>
+            </ThemeProvider>
+          </HydrationSuppressor>
+        </HydrationErrorBoundary>
       </body>
     </html>
   );

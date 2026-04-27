@@ -9,6 +9,8 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MessageAlert } from "@/components/ui/message-alert";
+import { FormError } from "@/components/ui/form-error";
+import { FieldError } from "@/components/ui/field-error";
 import Link from "next/link";
 import { Eye, EyeOff, Loader } from "lucide-react";
 
@@ -19,6 +21,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -33,12 +36,42 @@ export default function LoginPage() {
     }
   }, [mounted, authLoading, user, router]);
 
+  // Real-time email validation
+  useEffect(() => {
+    if (!email) {
+      setFieldErrors((prev) => ({ ...prev, email: "" }));
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setFieldErrors((prev) => ({ ...prev, email: "Invalid email format" }));
+    } else {
+      setFieldErrors((prev) => ({ ...prev, email: "" }));
+    }
+  }, [email]);
+
+  // Real-time password validation
+  useEffect(() => {
+    if (!password) {
+      setFieldErrors((prev) => ({ ...prev, password: "" }));
+      return;
+    }
+    if (password.length < 8) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        password: "Password must be at least 8 characters",
+      }));
+    } else {
+      setFieldErrors((prev) => ({ ...prev, password: "" }));
+    }
+  }, [password]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
-    // Client-side validation
+    // Final validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       setError("Invalid email format");
@@ -86,10 +119,24 @@ export default function LoginPage() {
         <div className="p-6 max-w-md mx-auto" suppressHydrationWarning>
           {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-4" suppressHydrationWarning>
-            {error && <MessageAlert message={error} type="error" />}
+            {error && (
+              <FormError
+                error={error}
+                onDismiss={() => setError("")}
+                autoScroll
+              />
+            )}
             <div className="space-y-2" suppressHydrationWarning>
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+              <Input
+                id="email"
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className={fieldErrors.email ? "border-red-500" : ""}
+              />
+              {fieldErrors.email && <FieldError error={fieldErrors.email} />}
             </div>
             <div className="space-y-2" suppressHydrationWarning>
               <Label htmlFor="password">Password</Label>
@@ -100,7 +147,7 @@ export default function LoginPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pr-10"
+                  className={`pr-10 ${fieldErrors.password ? "border-red-500" : ""}`}
                 />
                 <button
                   type="button"
@@ -111,11 +158,19 @@ export default function LoginPage() {
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
+              {fieldErrors.password && (
+                <FieldError error={fieldErrors.password} />
+              )}
               <Link href="/forgot-password" className="text-xs text-primary hover:underline">
                 Forgot password?
               </Link>
             </div>
-            <Button className="w-full" type="submit" disabled={loading} suppressHydrationWarning>
+            <Button
+              className="w-full"
+              type="submit"
+              disabled={loading || !email || !password || Object.values(fieldErrors).some((e) => e)}
+              suppressHydrationWarning
+            >
               {loading ? "Signing in..." : "Sign in"}
             </Button>
             <p className="text-center text-sm text-muted-foreground">

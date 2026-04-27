@@ -7,6 +7,10 @@ import { Role, User } from '../users/entities/user.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Patient } from '../patients/entities/patient.entity';
+import { Appointment } from '../appointments/entities/appointment.entity';
+import { Prescription } from '../prescriptions/entities/prescription.entity';
+import { Bill } from '../bills/entities/bill.entity';
+import { MedicalHistory } from '../patients/entities/medical-history.entity';
 
 @Injectable()
 export class AuthService {
@@ -18,6 +22,14 @@ export class AuthService {
     private jwtService: JwtService,
     @InjectRepository(Patient)
     private patientRepository: Repository<Patient>,
+    @InjectRepository(Appointment)
+    private appointmentRepository: Repository<Appointment>,
+    @InjectRepository(Prescription)
+    private prescriptionRepository: Repository<Prescription>,
+    @InjectRepository(Bill)
+    private billRepository: Repository<Bill>,
+    @InjectRepository(MedicalHistory)
+    private medicalHistoryRepository: Repository<MedicalHistory>,
   ) {
     // Initialize SMTP transporter
     if (process.env.SMTP_HOST && process.env.SMTP_PASSWORD) {
@@ -37,16 +49,18 @@ export class AuthService {
   }
 
   async signup(data: any): Promise<User> {
-    // Check if email+role combo exists
+    // Check if email already exists (one email = one profile rule)
     const userRole = data.role || Role.PATIENT;
-    const existingUser = await this.usersService.findByEmailAndRole(data.email, userRole);
+    const existingUser = await this.usersService.findByEmail(data.email);
     
+    // If user exists and email is NOT verified, they must verify first
     if (existingUser && !existingUser.isEmailVerified) {
       throw new UnauthorizedException('Email has not been verified yet. Please verify your email first.');
     }
 
-    if (existingUser && existingUser.isEmailVerified) {
-      throw new ConflictException(`This email is already registered as a ${userRole.toLowerCase()}`);
+    // If user exists but password is not 'temp' (i.e., actual user account), reject
+    if (existingUser && existingUser.password !== 'temp' && existingUser.isEmailVerified) {
+      throw new ConflictException(`This email is already registered. One email can only create one profile.`);
     }
 
     const hashedPassword = await bcrypt.hash(data.password, 10);
@@ -54,35 +68,60 @@ export class AuthService {
     // Parse date if provided
     const dateOfBirth = data.dateOfBirth ? new Date(data.dateOfBirth) : undefined;
     
-    const user = await this.usersService.create({
-      email: data.email,
-      password: hashedPassword,
-      firstName: data.firstName,
-      lastName: data.lastName,
-      phone: data.phone || null,
-      role: userRole,
-      address: data.address || null,
-      gender: data.gender || null,
-      dateOfBirth: dateOfBirth,
-      isEmailVerified: true, // Mark as verified if coming from verification flow
-    });
+    let user: User;
+
+    if (existingUser && existingUser.password === 'temp' && existingUser.isEmailVerified) {
+      // Update existing temporary user with actual signup data
+      this.logger.log(`🔄 Converting temporary user to full user: ${data.email}`);
+      user = await this.usersService.update(existingUser.id, {
+        password: hashedPassword,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phone: data.phone || null,
+        address: data.address || null,
+        gender: data.gender || null,
+        dateOfBirth: dateOfBirth,
+      });
+    } else {
+      // Create new user
+      user = await this.usersService.create({
+        email: data.email,
+        password: hashedPassword,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phone: data.phone || null,
+        role: userRole,
+        address: data.address || null,
+        gender: data.gender || null,
+        dateOfBirth: dateOfBirth,
+        isEmailVerified: true,
+      });
+    }
 
     // Create patient profile if registering as patient with medical data
     if (userRole === Role.PATIENT) {
-      const existingProfile = await this.patientRepository.findOne({ where: { userId: user.id } });
-      if (!existingProfile) {
-        const patientData = {
-          userId: user.id,
-          bloodGroup: data.bloodGroup || null,
-          height: data.height ? parseFloat(data.height) : null,
-          weight: data.weight ? parseFloat(data.weight) : null,
-          emergencyContact: data.emergencyContact || null,
-        } as any;
-        await this.patientRepository.save(this.patientRepository.create(patientData));
+      try {
+        const existingProfile = await this.patientRepository.findOne({ where: { userId: user.id } });
+        if (!existingProfile) {
+          const patientData = {
+            userId: user.id,
+            bloodGroup: data.bloodGroup || null,
+            height: data.height ? parseFloat(data.height) : null,
+            weight: data.weight ? parseFloat(data.weight) : null,
+            emergencyContact: data.emergencyContact || null,
+          } as any;
+          const savedPatient = await this.patientRepository.save(
+            this.patientRepository.create(patientData)
+          );
+          this.logger.log(`✅ Patient profile created for user: ${user.id}`);
+        }
+      } catch (error) {
+        this.logger.error(`❌ Failed to create patient profile for ${user.id}:`, error);
+        throw new Error('Failed to create patient profile. Please contact support.');
       }
     }
 
-    this.logger.log(`✅ User registered successfully: ${data.email} as ${userRole}`);
+    this.logger.log(`✅ User registered successfully: ${data.email} with role ${userRole}`);
     return user;
   }
 
@@ -274,13 +313,13 @@ export class AuthService {
 
   async sendVerificationEmail(email: string, role?: string) {
     const userRole = role || Role.PATIENT;
-    this.logger.log(`🔍 Checking if email already verified: ${email} for role ${userRole}`);
+    this.logger.log(`🔍 Checking if email already in use: ${email}`);
     
-    // Check if email+role combo already exists
-    let user = await this.usersService.findByEmailAndRole(email, userRole);
+    // Check if email already exists (regardless of role)
+    let user = await this.usersService.findByEmail(email);
     
     if (user && user.isEmailVerified) {
-      throw new ConflictException(`This email is already registered as a ${userRole.toLowerCase()}`);
+      throw new ConflictException(`This email is already registered. One email can only create one profile.`);
     }
 
     // If user doesn't exist, create a minimal unverified user record
@@ -366,9 +405,9 @@ export class AuthService {
 
   async verifyEmailCode(email: string, code: string, role?: string) {
     const userRole = role || Role.PATIENT;
-    this.logger.log(`🔍 Verifying email code for: ${email} (${userRole})`);
+    this.logger.log(`🔍 Verifying email code for: ${email}`);
     
-    const user = await this.usersService.findByEmailAndRole(email, userRole);
+    const user = await this.usersService.findByEmail(email);
     if (!user) {
       this.logger.warn(`⚠️ Verification attempted for non-existent user: ${email}`);
       throw new UnauthorizedException('Email not found. Please register first.');
@@ -392,8 +431,64 @@ export class AuthService {
       emailVerificationCodeExpiry: null,
     } as any);
 
-    this.logger.log(`✅ Email verified successfully for ${email} (${userRole})`);
+    this.logger.log(`✅ Email verified successfully for ${email}`);
 
     return { success: true, message: 'Email verified successfully. You can now complete your registration.' };
+  }
+
+  async deleteAccount(userId: string): Promise<{ success: boolean; message: string }> {
+    this.logger.log(`🗑️ Attempting to delete account for user: ${userId}`);
+    
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    try {
+      // Delete patient profile if patient role
+      if (user.role === Role.PATIENT) {
+        // Get patient ID first
+        const patient = await this.patientRepository.findOne({ where: { userId } });
+        if (patient) {
+          this.logger.log(`🗑️ Deleting related data for patient: ${patient.id}`);
+
+          // Delete all related data first (respect foreign key constraints)
+          // 1. Delete prescriptions
+          await this.prescriptionRepository.delete({ patientId: patient.id });
+          this.logger.log(`✅ Deleted prescriptions for patient: ${patient.id}`);
+
+          // 2. Delete medical history
+          await this.medicalHistoryRepository.delete({ patientId: patient.id });
+          this.logger.log(`✅ Deleted medical history for patient: ${patient.id}`);
+
+          // 3. Delete bills
+          await this.billRepository.delete({ patientId: patient.id });
+          this.logger.log(`✅ Deleted bills for patient: ${patient.id}`);
+
+          // 4. Delete appointments
+          await this.appointmentRepository.delete({ patientId: patient.id });
+          this.logger.log(`✅ Deleted appointments for patient: ${patient.id}`);
+
+          // 5. Finally, delete patient profile
+          await this.patientRepository.delete({ userId });
+          this.logger.log(`✅ Deleted patient profile for user: ${userId}`);
+        }
+      }
+
+      // Delete user account
+      const deleted = await this.usersService.delete(userId);
+      if (!deleted) {
+        throw new Error('Failed to delete user');
+      }
+
+      this.logger.log(`✅ User account deleted successfully: ${user.email} (${user.role})`);
+      return {
+        success: true,
+        message: 'Your account has been permanently deleted. All your data has been removed from our system.',
+      };
+    } catch (error) {
+      this.logger.error(`❌ Failed to delete account for ${userId}:`, error);
+      throw new Error('Failed to delete account. Please contact support.');
+    }
   }
 }

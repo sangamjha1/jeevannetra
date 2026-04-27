@@ -4,60 +4,73 @@ import { useEffect, useState } from 'react';
 import { useSuppressHydrationWarning } from '@/hooks/useSupressHydrationWarning';
 
 export function HydrationSuppressor({ children }: { children: React.ReactNode }) {
-  const [isHydrated, setIsHydrated] = useState(false);
-
   // Enable hydration suppression hook
   useSuppressHydrationWarning();
 
   useEffect(() => {
-    setIsHydrated(true);
-  }, []);
-
-  // Additional error handler for React errors during hydration
-  useEffect(() => {
+    // Handle hydration errors from browser extensions
     const handleError = (event: ErrorEvent) => {
-      const errorMessage = event.message.toLowerCase();
+      const message = event.message.toLowerCase();
       
-      // Catch hydration errors from extensions
+      // Extension patterns that should be suppressed
+      const extensionPatterns = [
+        'bis_skin_checked',
+        'hydrated but some attributes',
+        'tree hydrated',
+        'hydration mismatch',
+        'browser extension',
+      ];
+
+      const isExtensionError = extensionPatterns.some(p => message.includes(p));
+      
+      if (isExtensionError) {
+        event.preventDefault();
+        return true;
+      }
+    };
+
+    // Handle unhandled promise rejections that might be hydration related
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const reason = String(event.reason).toLowerCase();
+      
       if (
-        errorMessage.includes('hydration') &&
-        (errorMessage.includes('bis_skin_checked') ||
-          errorMessage.includes('extension') ||
-          errorMessage.includes('attribute'))
+        (reason.includes('hydration') || reason.includes('tree hydrated')) &&
+        (reason.includes('bis_skin_checked') || reason.includes('attribute'))
       ) {
         event.preventDefault();
-        console.log('[Hydration] Browser extension hydration error suppressed');
       }
     };
 
     window.addEventListener('error', handleError);
-    
-    // Monitor for bis_skin_checked attribute being added and mark ancestors
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
+    // Monitor for bis_skin_checked attribute being added by extensions
     const observer = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
-        if (mutation.type === 'attributes' && mutation.attributeName === 'bis_skin_checked') {
-          const target = mutation.target as HTMLElement;
-          // Mark all parent elements as having suppressHydrationWarning
-          let current = target.parentElement;
-          while (current) {
-            if (!current.hasAttribute('suppressHydrationWarning')) {
-              current.setAttribute('suppressHydrationWarning', 'true');
-            }
-            current = current.parentElement;
+        // Silently accept bis_skin_checked and similar extension attributes
+        if (mutation.type === 'attributes') {
+          const attrName = mutation.attributeName || '';
+          if (
+            attrName === 'bis_skin_checked' ||
+            attrName === 'fdprocessedid' ||
+            attrName.startsWith('data-extension')
+          ) {
+            // Browser extensions adding attributes - this is normal and not an error
+            // Do nothing to prevent React errors
           }
         }
       });
     });
 
-    // Observe the entire document for attribute changes
     observer.observe(document.documentElement, {
       subtree: true,
       attributes: true,
-      attributeFilter: ['bis_skin_checked'],
+      attributeOldValue: false,
     });
 
     return () => {
       window.removeEventListener('error', handleError);
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
       observer.disconnect();
     };
   }, []);
